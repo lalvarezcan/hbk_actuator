@@ -24,7 +24,7 @@ CurrentRegulator::CurrentRegulator(Inverter *inverter, PositionSensor *position_
     I_C = 0;
     I_Alpha = 0;
     I_Beta = 0;
-    count = 0;
+    //count = 0;
     _Kp = Kp;
     _Ki = Ki;
     Q_Integral = 0;
@@ -44,12 +44,12 @@ void CurrentRegulator::SampleCurrent(){
     _Inverter->GetCurrent(&I_A, &I_B, &I_C);
     Clarke(I_A, I_B, &I_Alpha, &I_Beta);
     Park(I_Alpha, I_Beta, theta_elec, &I_D, &I_Q);
-    count += 1;
-    if(count > 10000) {
-        count=0;
+    //count += 1;
+    //if(count > 10000) {
+    //    count=0;
     //    printf("I_A:  %f        I_C:  %f       I_C:  %f\n\r", I_A, I_B, I_C);
-    IQ_Ref = -IQ_Ref;
-        }
+    //IQ_Ref = -IQ_Ref;
+    //    }
 
     DAC->DHR12R1 = (int) (I_Q*490.648f) + 2048;
     //DAC->DHR12R1 = (int) (I_Alpha*4096.0f) + 2048;
@@ -79,8 +79,7 @@ void CurrentRegulator::SetVoltage(){
     
 void CurrentRegulator::Commutate(){
     theta_elec = _PositionSensor->GetElecPosition();
-    SampleCurrent();
-    //Run control loop
-    Update();
-    SetVoltage();
+    SampleCurrent(); //Grab most recent current sample
+    Update();   //Run control loop
+    SetVoltage();   //Set inverter duty cycles
     }

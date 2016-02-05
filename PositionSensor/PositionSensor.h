@@ -16,10 +16,10 @@ public:
 private:
     InterruptIn *ZPulse;
     DigitalIn *ZSense;
-    DigitalOut *ZTest;
+    //DigitalOut *ZTest;
     virtual void ZeroEncoderCount(void);
     int _CPR;
-    int state;
+    //int state;
     float _offset;
 };
 

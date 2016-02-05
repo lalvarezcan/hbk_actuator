@@ -25,7 +25,7 @@ PositionSensorEncoder::PositionSensorEncoder(int CPR, float offset) {
  
     TIM3->CR1   = 0x0001;     // CEN(Counter ENable)='1'     < TIM control register 1
     TIM3->SMCR  = TIM_ENCODERMODE_TI12;     // SMS='011' (Encoder mode 3)  < TIM slave mode control register
-    TIM3->CCMR1 = 0xf1f1;     // CC1S='01' CC2S='01'         < TIM capture/compare mode register 1
+    TIM3->CCMR1 = 0xf1f1;     // CC1S='01' CC2S='01'         < TIM capture/compare mode register 1, maximum digital filtering
     TIM3->CCMR2 = 0x0000;     //                             < TIM capture/compare mode register 2
     TIM3->CCER  = 0x0011;     // CC1P CC2P                   < TIM capture/compare enable register
     TIM3->PSC   = 0x0000;     // Prescaler = (0+1)           < TIM prescaler
@@ -38,12 +38,10 @@ PositionSensorEncoder::PositionSensorEncoder(int CPR, float offset) {
     ZPulse->enable_irq();
     ZPulse->rise(this, &PositionSensorEncoder::ZeroEncoderCount);
     ZPulse->mode(PullDown);
-    //TIM5->CCMR1 = 0xf1f1;     // CC1S='01' CC2S='01'         < TIM capture/compare mode register 1
 
     
-    ZTest = new DigitalOut(PC_2);
-    ZTest->write(1);
-    //int state = 0;
+    //ZTest = new DigitalOut(PC_2);
+    //ZTest->write(1);
     
     
 }
@@ -73,8 +71,8 @@ void PositionSensorEncoder::ZeroEncoderCount(void){
     if (ZSense->read() == 1){
         if (ZSense->read() == 1){
             TIM3->CNT=0x8000;
-            state = !state;
-            ZTest->write(state);
+            //state = !state;
+            //ZTest->write(state);
         }
         }
     }

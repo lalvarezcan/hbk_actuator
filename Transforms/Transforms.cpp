@@ -7,8 +7,6 @@ using namespace FastMath;
 void Transforms::Park(float alpha, float beta, float theta, float *d, float *q){
     float cosine = cos(theta);
     float sine = sin(theta);
-    //float a = sine;
-    //float b = cosine;
     *d = alpha*cosine - beta*sine;
     *q = -beta*cosine - alpha*sine;
     //DAC->DHR12R1 = (int) (*q*49.648f) + 2048;

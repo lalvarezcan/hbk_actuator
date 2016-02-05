@@ -8,8 +8,6 @@ Inverter::Inverter(PinName PinA, PinName PinB, PinName PinC, PinName PinEnable, 
 
     
     Enable = new DigitalOut(PinEnable);
-    //Current_B = new AnalogIn(BSense);
-    //Current_C = new AnalogIn(CSense);
     
     RCC->AHB1ENR |= RCC_AHB1ENR_GPIOCEN; // enable the clock to GPIOA
     RCC->APB1ENR |= 0x00000001; // enable TIM2 clock
@@ -53,7 +51,7 @@ Inverter::Inverter(PinName PinA, PinName PinB, PinName PinC, PinName PinEnable, 
     // DAC set-up
      RCC->APB1ENR |= 0x20000000; // Enable clock for DAC
      DAC->CR |= 0x00000001; // DAC control reg, both channels ON
-     GPIOA->MODER |= 0x00000300; // PA04 as analog outputs   
+     GPIOA->MODER |= 0x00000300; // PA04 as analog output   
      
      EnableInverter();
      SetDTC(0.0f, 0.0f, 0.0f);
@@ -96,17 +94,13 @@ void Inverter::GetCurrent(float *A, float *B, float *C){
 
 void Inverter::SampleCurrent(void){
  //   Dbg->write(1);
-    GPIOC->ODR ^= (1 << 4);
+    GPIOC->ODR ^= (1 << 4); //Toggle pin for debugging
     I_B = _I_Scale*((float) (ADC1->DR) -  I_B_Offset);
     I_C = _I_Scale*((float) (ADC2->DR)-  I_C_Offset);
     I_A = -I_B - I_C;
     //DAC->DHR12R1 = ADC2->DR; 
     //DAC->DHR12R1 = TIM3->CNT>>2;//ADC2->DR; // pass ADC -> DAC, also clears EOC flag
     ADC1->CR2  |= 0x40000000; 
-
-    //I_B = Current_B->read()*_I_Scale;
-    //I_C = Current_C->read()*_I_Scale;
-    GPIOC->ODR ^= (1 << 4);
- //   Dbg->write(0);
+    GPIOC->ODR ^= (1 << 4); //toggle pin for debugging
     }
     
