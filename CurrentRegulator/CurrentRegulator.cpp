@@ -11,7 +11,7 @@ CurrentRegulator::CurrentRegulator(Inverter *inverter, PositionSensor *position_
     _Inverter = inverter;
     PWM = new SPWM(inverter, 2.0);
     _PositionSensor = position_sensor;
-    IQ_Ref = .7;
+    IQ_Ref = 5;
     ID_Ref = 0;
     V_Q = 0;
     V_D = 0;
@@ -30,7 +30,7 @@ CurrentRegulator::CurrentRegulator(Inverter *inverter, PositionSensor *position_
     Q_Integral = 0;
     D_Integral = 0;
     Int_Max = .9;
-    DTC_Max = .95;
+    DTC_Max = .97;
     //theta_elec = _PositionSensor->GetElecPosition();
 
     }
@@ -63,9 +63,9 @@ void CurrentRegulator::Update(){
         D_Integral += D_Error*_Ki*_Kp;
         
         if (Q_Integral > Int_Max) Q_Integral = Int_Max;
-        else if(D_Integral < -Int_Max) D_Integral = Int_Max;
+        else if(Q_Integral < -Int_Max) Q_Integral = -Int_Max;
         if (D_Integral > Int_Max) D_Integral = Int_Max;
-        else if(Q_Integral < -Int_Max) Q_Integral = Int_Max;       
+        else if(D_Integral < -Int_Max) D_Integral = -Int_Max;       
          
         V_Q = Q_Integral + _Kp*Q_Error;
         V_D = D_Integral + _Kp*D_Error;

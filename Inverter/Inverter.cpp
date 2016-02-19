@@ -9,33 +9,49 @@ Inverter::Inverter(PinName PinA, PinName PinB, PinName PinC, PinName PinEnable, 
     
     Enable = new DigitalOut(PinEnable);
     
-    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOCEN; // enable the clock to GPIOA
-    RCC->APB1ENR |= 0x00000001; // enable TIM2 clock
-    
+    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOCEN; // enable the clock to GPIOC
+    //RCC->APB1ENR |= 0x00000001; // enable TIM2 clock
+    RCC->APB2ENR |= RCC_APB2ENR_TIM1EN; // enable TIM1 clock
+
     GPIOC->MODER = (1 << 8); // set pin 4 to be general purpose output
 
     PWM_A = new FastPWM(PinA);
     PWM_B = new FastPWM(PinB);
     PWM_C = new FastPWM(PinC);
 
-    TIM2->CR1 &= ~(TIM_CR1_CEN);
-    TIM2->CR1 |= TIM_CR1_CMS;
-    TIM2->CR1 |= TIM_CR1_CEN;
-     
+    //TIM2->CR1 &= ~(TIM_CR1_CEN);
+    //TIM2->CR1 |= TIM_CR1_CMS;
+    //TIM2->CR1 |= TIM_CR1_CEN;
+
     //PWM_A->period(Period);
     
-    //PWM Setup
-    TIM2->PSC = 0x0; // no prescaler, timer counts up in sync with the peripheral clock
-    TIM2->ARR = 0x8CA; // 
-    TIM2->CCER |= TIM_CCER_CC1NP;
-         
-    //ISR Setup     
-    NVIC->ISER[0] |= 1<< (TIM2_IRQn); // enable the TIM2 IRQ
-     
-    TIM2->DIER |= TIM_DIER_UIE; // enable update interrupt
-    TIM2->CR1 |= TIM_CR1_ARPE; // autoreload on, 
-    TIM2->EGR |= TIM_EGR_UG;   
+     //ISR Setup     
+    NVIC_EnableIRQ(TIM1_UP_TIM10_IRQn);   //Enable TIM1 IRQ
 
+    TIM1->DIER |= TIM_DIER_UIE; // enable update interrupt
+    TIM1->CR1 = 0x40;//CMS = 10, interrupt only when counting up
+    TIM1->CR1 |= TIM_CR1_ARPE; // autoreload on, 
+    TIM1->RCR |= 0x001; // update event once per up/down count of tim1 
+    TIM1->EGR |= TIM_EGR_UG;
+ 
+    //PWM Setup
+
+    TIM1->PSC = 0x0; // no prescaler, timer counts up in sync with the peripheral clock
+    TIM1->ARR = 0x1194; // 20 Khz
+    TIM1->CCER |= ~(TIM_CCER_CC1NP); //Interupt when low side is on.
+    TIM1->CR1 |= TIM_CR1_CEN;  
+    
+    //NVIC->ISER[0] |= 1<< (TIM2_IRQn); // enable the TIM2 IRQ    
+     //TIM2->DIER |= TIM_DIER_UIE; // enable update interrupt
+    //TIM2->CR1 |= TIM_CR1_ARPE; // autoreload on, 
+    //TIM2->EGR |= TIM_EGR_UG;               
+    //TIM2->PSC = 0x0; // no prescaler, timer counts up in sync with the peripheral clock
+    //TIM2->ARR = 0x8CA; // 
+    //TIM2->CCER |= TIM_CCER_CC1NP;
+      //TIM1->CR1 &= ~(TIM_CR1_CEN);
+    //TIM1->CR1 |= TIM_CR1_CMS;      
+
+    
     // ADC Setup
      RCC->APB2ENR |= RCC_APB2ENR_ADC2EN; // clock for ADC2
      RCC->APB2ENR |= RCC_APB2ENR_ADC1EN; // clock for ADC1
@@ -60,9 +76,9 @@ Inverter::Inverter(PinName PinA, PinName PinB, PinName PinC, PinName PinEnable, 
     }
 
 void Inverter::SetDTC(float DTC_A, float DTC_B, float DTC_C){
-        PWM_A->write(DTC_A);
-        PWM_B->write(DTC_B);
-        PWM_C->write(DTC_C);
+        PWM_A->write(1.0f-DTC_A);
+        PWM_B->write(1.0f-DTC_B);
+        PWM_C->write(1.0f-DTC_C);
     }
 
 void Inverter::EnableInverter(){
