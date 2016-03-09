@@ -39,18 +39,7 @@ Inverter::Inverter(PinName PinA, PinName PinB, PinName PinC, PinName PinEnable, 
     TIM1->PSC = 0x0; // no prescaler, timer counts up in sync with the peripheral clock
     TIM1->ARR = 0x1194; // 20 Khz
     TIM1->CCER |= ~(TIM_CCER_CC1NP); //Interupt when low side is on.
-    TIM1->CR1 |= TIM_CR1_CEN;  
-    
-    //NVIC->ISER[0] |= 1<< (TIM2_IRQn); // enable the TIM2 IRQ    
-     //TIM2->DIER |= TIM_DIER_UIE; // enable update interrupt
-    //TIM2->CR1 |= TIM_CR1_ARPE; // autoreload on, 
-    //TIM2->EGR |= TIM_EGR_UG;               
-    //TIM2->PSC = 0x0; // no prescaler, timer counts up in sync with the peripheral clock
-    //TIM2->ARR = 0x8CA; // 
-    //TIM2->CCER |= TIM_CCER_CC1NP;
-      //TIM1->CR1 &= ~(TIM_CR1_CEN);
-    //TIM1->CR1 |= TIM_CR1_CMS;      
-
+    TIM1->CR1 |= TIM_CR1_CEN;     
     
     // ADC Setup
      RCC->APB2ENR |= RCC_APB2ENR_ADC2EN; // clock for ADC2

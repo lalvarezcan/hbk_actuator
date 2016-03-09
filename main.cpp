@@ -42,6 +42,12 @@ extern "C" void TIM1_UP_TIM10_IRQHandler(void) {
 void Loop(void){
     foc.Commutate();
     }
+
+void PrintStuff(void){
+    float velocity = encoder.GetMechVelocity();
+    float position = encoder.GetMechPosition();
+    printf("%f, %f;\n\r", position, velocity);
+    }
 /*
 void voltage_foc(void){
     theta = encoder.GetElecPosition() + offset;
@@ -56,10 +62,12 @@ int main() {
     wait(1);
 
     testing.attach(&Loop, .0001);
-    //inverter.SetDTC(.2, .5, .97);
+    //testing.attach(&PrintStuff, .05);
+    //inverter.SetDTC(.1, 0, 0);
     //inverter.EnableInverter();
 
     while(1) {
-
+        //printf("%f\n\r", encoder.GetElecPosition());
+        //wait(.1);
     }
 }

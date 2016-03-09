@@ -3,11 +3,11 @@
 #include "PositionSensor.h"
 #include <math.h>
 
-
     
 PositionSensorEncoder::PositionSensorEncoder(int CPR, float offset) {
     _CPR = CPR;
     _offset = offset;
+    MechPosition = 0;
     
     // Enable clock for GPIOA
     __GPIOA_CLK_ENABLE(); //equivalent from hal_rcc.h
@@ -33,6 +33,26 @@ PositionSensorEncoder::PositionSensorEncoder(int CPR, float offset) {
   
     TIM3->CNT = 0x8000;  //reset the counter before we use it  
     
+    // Extra Timer for velocity measurement
+    /*
+    __TIM2_CLK_ENABLE();
+    TIM3->CR2 = 0x030;  //MMS = 101
+    
+    TIM2->PSC = 0x03;
+    //TIM2->CR2 |= TIM_CR2_TI1S;
+    TIM2->SMCR = 0x24; //TS = 010 for ITR2, SMS = 100 (reset counter at edge)
+    TIM2->CCMR1 = 0x3;// CC1S = 11, IC1 mapped on TRC
+    
+    //TIM2->CR2 |= TIM_CR2_TI1S;
+    TIM2->CCER |= TIM_CCER_CC1P;
+    //TIM2->CCER |= TIM_CCER_CC1NP;
+    TIM2->CCER |= TIM_CCER_CC1E;
+    
+    
+    TIM2->CR1 = 0x01;       //CEN
+    */
+    TIM3->CR1   = 0x01;     // CEN
+    
     ZPulse = new InterruptIn(PB_0);
     ZSense = new DigitalIn(PB_0);
     ZPulse->enable_irq();
@@ -50,14 +70,20 @@ float PositionSensorEncoder::GetMechPosition() {        //returns rotor angle in
     int raw = TIM3->CNT-0x8000;
     if (raw < 0) raw += _CPR;
     if (raw >= _CPR) raw -= _CPR;
-    return 6.28318530718f*(raw)/(float)_CPR + _offset;    
+    float signed_mech = fmod(((6.28318530718f*(raw)/(float)_CPR + _offset)), 6.28318530718f); //7 pole pairs
+    if (signed_mech < 0){
+        return signed_mech + 6.28318530718f;
+        }
+    else{
+        return signed_mech;
+        }
 }
 
 float PositionSensorEncoder::GetElecPosition() {        //returns rotor electrical angle in radians.
     int raw = TIM3->CNT-0x8000;
     if (raw < 0) raw += _CPR;
     if (raw >= _CPR) raw -= _CPR;
-    float signed_elec = fmod((7.0f*(6.28318530718f*(raw)/(float)_CPR + _offset)), 6.28318530718f);
+    float signed_elec = fmod((7.0f*(6.28318530718f*(raw)/(float)_CPR + _offset)), 6.28318530718f); //7 pole pairs
     //float signed_elec = (7*(6.28318530718*(TIM3->CNT-0x8000)/(float)_CPR + _offset));
     if (signed_elec < 0){
         return signed_elec + 6.28318530718f;
@@ -66,6 +92,19 @@ float PositionSensorEncoder::GetElecPosition() {        //returns rotor electric
         return signed_elec;
         }
 }
+
+float PositionSensorEncoder::GetElecVelocity(){
+    float rawPeriod = TIM2->CCR1; //Clock Ticks
+    float  dir = (((TIM3->CR1)>>4)&1)*2-1;    // +/- 1
+    return dir*7*90000000.0f*(6.28318530718f/(float)_CPR)/rawPeriod;
+    }
+    
+float PositionSensorEncoder::GetMechVelocity(){
+    float rawPeriod = TIM2->CCR1; //Clock Ticks
+    float  dir = -2.0f*(float)(((TIM3->CR1)>>4)&1)+1.0f;    // +/- 1
+    return dir*90000000.0f*(6.28318530718f/(float)_CPR)/rawPeriod;
+    
+    }
 
 void PositionSensorEncoder::ZeroEncoderCount(void){
     if (ZSense->read() == 1){

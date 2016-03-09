@@ -13,6 +13,8 @@ public:
     PositionSensorEncoder(int CPR, float offset);
     virtual float GetMechPosition();
     virtual float GetElecPosition();
+    virtual float GetMechVelocity();
+    virtual float GetElecVelocity();
 private:
     InterruptIn *ZPulse;
     DigitalIn *ZSense;
@@ -20,7 +22,7 @@ private:
     virtual void ZeroEncoderCount(void);
     int _CPR;
     //int state;
-    float _offset;
+    float _offset, MechPosition;
 };
 
 #endif

@@ -11,7 +11,7 @@ CurrentRegulator::CurrentRegulator(Inverter *inverter, PositionSensor *position_
     _Inverter = inverter;
     PWM = new SPWM(inverter, 2.0);
     _PositionSensor = position_sensor;
-    IQ_Ref = 5;
+    IQ_Ref = 1;
     ID_Ref = 0;
     V_Q = 0;
     V_D = 0;
