@@ -15,10 +15,12 @@ class CurrentRegulator{
         void SampleCurrent();
         void SetVoltage();
         void Update();
+        void SendSPI();
         Inverter* _Inverter;
         PositionSensor* _PositionSensor;
         SPWM* PWM;
-        int count;
+        //Serial* pc;
+        //int count;
             
     
     

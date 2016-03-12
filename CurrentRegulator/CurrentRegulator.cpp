@@ -32,7 +32,14 @@ CurrentRegulator::CurrentRegulator(Inverter *inverter, PositionSensor *position_
     Int_Max = .9;
     DTC_Max = .97;
     //theta_elec = _PositionSensor->GetElecPosition();
+    //pc = new Serial(PA_2, PA_3);
+    //pc->baud(115200);
 
+    }
+
+void CurrentRegulator::SendSPI(){
+    
+    
     }
 
 void CurrentRegulator::UpdateRef(float D, float Q){
@@ -51,7 +58,7 @@ void CurrentRegulator::SampleCurrent(){
     //IQ_Ref = -IQ_Ref;
     //    }
 
-    DAC->DHR12R1 = (int) (I_Q*490.648f) + 2048;
+    //DAC->DHR12R1 = (int) (I_Q*490.648f) + 2048;
     //DAC->DHR12R1 = (int) (I_Alpha*4096.0f) + 2048;
     }
     
@@ -78,8 +85,23 @@ void CurrentRegulator::SetVoltage(){
     
     
 void CurrentRegulator::Commutate(){
+    //count += 1;
     theta_elec = _PositionSensor->GetElecPosition();
     SampleCurrent(); //Grab most recent current sample
     Update();   //Run control loop
     SetVoltage();   //Set inverter duty cycles
+    /*
+    if (count==500){
+        //printf("%d %d %d %d\n\r", (int) (I_Q*1000), (int) (I_D*1000), (int) (I_A*1000), int (I_B*1000));
+        pc->putc((unsigned char) (theta_elec*40.0f));
+        pc->putc((unsigned char) (I_A*100.0f+127));
+        pc->putc((unsigned char) (I_B*100.0f+127));
+        pc->putc((unsigned char) (I_Alpha*100.0f+127));
+        pc->putc((unsigned char) (I_Beta*100.0f+127));
+        pc->putc((unsigned char) (I_Q*100.0f+127));
+        pc->putc((unsigned char) (I_D*100.0f+127));
+        pc->putc((0xff));
+        count = 0;
+        }
+        */
     }

@@ -14,10 +14,15 @@ CurrentRegulator foc(&inverter, &encoder, .005, .5);
 Ticker  testing;
 
 
+
+//SPI spi(PB_15, PB_14, PB_13);
+//GPIOB->MODER = (1 << 8); // set pin 4 to be general purpose output
+
+//DigitalOut chipselect(PB_12);
+
 using namespace FastMath;
 using namespace Transforms;
 
-//float offset = 0;//-0.24;
 
 // Current Sampling IRQ
 /*
@@ -60,7 +65,6 @@ void voltage_foc(void){
        
 int main() {
     wait(1);
-
     testing.attach(&Loop, .0001);
     //testing.attach(&PrintStuff, .05);
     //inverter.SetDTC(.1, 0, 0);
