@@ -69,7 +69,6 @@ int main() {
     //testing.attach(&PrintStuff, .05);
     //inverter.SetDTC(.1, 0, 0);
     //inverter.EnableInverter();
-
     while(1) {
         //printf("%f\n\r", encoder.GetElecPosition());
         //wait(.1);

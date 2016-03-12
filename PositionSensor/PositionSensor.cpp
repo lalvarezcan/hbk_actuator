@@ -1,7 +1,7 @@
 
 #include "mbed.h"
 #include "PositionSensor.h"
-#include <math.h>
+//#include <math.h>
 
     
 PositionSensorEncoder::PositionSensorEncoder(int CPR, float offset) {

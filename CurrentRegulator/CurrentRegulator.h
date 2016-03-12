@@ -18,7 +18,7 @@ class CurrentRegulator{
         void SendSPI();
         Inverter* _Inverter;
         PositionSensor* _PositionSensor;
-        SPWM* PWM;
+        SVM* PWM;
         //Serial* pc;
         //int count;
             

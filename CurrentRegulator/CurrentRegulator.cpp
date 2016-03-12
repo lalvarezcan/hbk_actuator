@@ -9,7 +9,7 @@ using namespace Transforms;
 
 CurrentRegulator::CurrentRegulator(Inverter *inverter, PositionSensor *position_sensor, float Kp, float Ki){
     _Inverter = inverter;
-    PWM = new SPWM(inverter, 2.0);
+    PWM = new SVPWM(inverter, 2.0);
     _PositionSensor = position_sensor;
     IQ_Ref = .5;
     ID_Ref = 0;
