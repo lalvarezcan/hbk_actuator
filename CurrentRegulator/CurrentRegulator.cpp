@@ -11,12 +11,15 @@ CurrentRegulator::CurrentRegulator(Inverter *inverter, PositionSensor *position_
     _Inverter = inverter;
     PWM = new SPWM(inverter, 2.0);
     _PositionSensor = position_sensor;
-    IQ_Ref = 1;
+    IQ_Ref = .5;
     ID_Ref = 0;
     V_Q = 0;
     V_D = 0;
     V_Alpha = 0;
     V_Beta = 0;
+    V_A = 0;
+    V_B = 0;
+    V_C = 0;
     I_Q = 0;
     I_D = 0;
     I_A = 0;
@@ -76,11 +79,15 @@ void CurrentRegulator::Update(){
          
         V_Q = Q_Integral + _Kp*Q_Error;
         V_D = D_Integral + _Kp*D_Error;
+        
+        
     }
         
 void CurrentRegulator::SetVoltage(){
     InvPark(V_D, V_Q, theta_elec, &V_Alpha, &V_Beta);
-    PWM->Update_DTC(V_Alpha, V_Beta);
+    InvClarke(V_Alpha, V_Beta, &V_A, &V_B, &V_C);
+    PWM->Update_DTC(V_A, V_B, V_C);
+    //PWM->Update_DTC(V_Alpha, V_Beta);
     }
     
     

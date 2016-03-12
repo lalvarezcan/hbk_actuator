@@ -70,7 +70,7 @@ float PositionSensorEncoder::GetMechPosition() {        //returns rotor angle in
     int raw = TIM3->CNT-0x8000;
     if (raw < 0) raw += _CPR;
     if (raw >= _CPR) raw -= _CPR;
-    float signed_mech = fmod(((6.28318530718f*(raw)/(float)_CPR + _offset)), 6.28318530718f); //7 pole pairs
+    float signed_mech = fmod(((6.28318530718f*(raw)/(float)_CPR + _offset)), 6.28318530718f);
     if (signed_mech < 0){
         return signed_mech + 6.28318530718f;
         }

@@ -9,6 +9,8 @@ void Transforms::Park(float alpha, float beta, float theta, float *d, float *q){
     float sine = sin(theta);
     *d = alpha*cosine - beta*sine;
     *q = -beta*cosine - alpha*sine;
+    //*d = alpha*cosine + beta*sine;
+    //*q = beta*cosine - alpha*sine;
     //DAC->DHR12R1 = (int) (*q*49.648f) + 2048;
     //DAC->DHR12R1 = (int) (*q*2048.0f) + 2048;
     }
