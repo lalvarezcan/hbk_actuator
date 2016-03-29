@@ -9,9 +9,9 @@ using namespace Transforms;
 
 CurrentRegulator::CurrentRegulator(Inverter *inverter, PositionSensor *position_sensor, float Kp, float Ki){
     _Inverter = inverter;
-    PWM = new SVPWM(inverter, 2.0);
+    PWM = new SPWM(inverter, 2.0);
     _PositionSensor = position_sensor;
-    IQ_Ref = .5;
+    IQ_Ref = 2;
     ID_Ref = 0;
     V_Q = 0;
     V_D = 0;
@@ -79,6 +79,7 @@ void CurrentRegulator::Update(){
          
         V_Q = Q_Integral + _Kp*Q_Error;
         V_D = D_Integral + _Kp*D_Error;
+        //V_D = 0;
         
         
     }
@@ -93,10 +94,13 @@ void CurrentRegulator::SetVoltage(){
     
 void CurrentRegulator::Commutate(){
     //count += 1;
+    GPIOC->ODR = (1 << 4); //Toggle pin for debugging
     theta_elec = _PositionSensor->GetElecPosition();
     SampleCurrent(); //Grab most recent current sample
     Update();   //Run control loop
     SetVoltage();   //Set inverter duty cycles
+    GPIOC->ODR = (0 << 4); //Toggle pin for debugging
+
     /*
     if (count==500){
         //printf("%d %d %d %d\n\r", (int) (I_Q*1000), (int) (I_D*1000), (int) (I_A*1000), int (I_B*1000));

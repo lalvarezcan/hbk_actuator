@@ -5,8 +5,10 @@
 using namespace FastMath;
 
 void Transforms::Park(float alpha, float beta, float theta, float *d, float *q){
-    float cosine = cos(theta);
-    float sine = sin(theta);
+    //float cosine = cos(theta);
+    //float sine = sin(theta);
+    float cosine = FastCos(theta);
+    float sine = FastSin(theta);
     *d = alpha*cosine - beta*sine;
     *q = -beta*cosine - alpha*sine;
     //*d = alpha*cosine + beta*sine;
@@ -16,8 +18,10 @@ void Transforms::Park(float alpha, float beta, float theta, float *d, float *q){
     }
 
 void Transforms::InvPark(float d, float q, float theta, float *alpha, float *beta){
-    float cosine = cos(theta);
-    float sine = sin(theta);
+    //float cosine = cos(theta);
+    //float sine = sin(theta);
+    float cosine = FastCos(theta);
+    float sine = FastSin(theta);
     *alpha = d*cosine - q*sine;
     *beta = q*cosine + d*sine;
     }

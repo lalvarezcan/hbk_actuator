@@ -20,9 +20,10 @@ private:
     DigitalIn *ZSense;
     //DigitalOut *ZTest;
     virtual void ZeroEncoderCount(void);
-    int _CPR;
+    virtual void ZeroEncoderCountDown(void);
+    int _CPR, flag, rotations;
     //int state;
-    float _offset, MechPosition;
+    float _offset, MechPosition, dir, test_pos;
 };
 
 #endif

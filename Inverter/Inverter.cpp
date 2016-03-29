@@ -99,13 +99,13 @@ void Inverter::GetCurrent(float *A, float *B, float *C){
 
 void Inverter::SampleCurrent(void){
  //   Dbg->write(1);
-    //GPIOC->ODR ^= (1 << 4); //Toggle pin for debugging
+    GPIOC->ODR ^= (1 << 4); //Toggle pin for debugging
     I_B = _I_Scale*((float) (ADC1->DR) -  I_B_Offset);
     I_C = _I_Scale*((float) (ADC2->DR)-  I_C_Offset);
     I_A = -I_B - I_C;
     //DAC->DHR12R1 = ADC2->DR; 
     //DAC->DHR12R1 = TIM3->CNT>>2;//ADC2->DR; // pass ADC -> DAC, also clears EOC flag
     ADC1->CR2  |= 0x40000000; 
-    //GPIOC->ODR ^= (1 << 4); //toggle pin for debugging
+    GPIOC->ODR ^= (1 << 4); //toggle pin for debugging
     }
     
