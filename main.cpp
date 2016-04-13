@@ -5,16 +5,24 @@
 #include "FastMath.h"
 #include "Transforms.h"
 #include "CurrentRegulator.h"
-//#include "TorqueController.h"
+#include "TorqueController.h"
 //#include "ImpedanceController.h"
-PositionSensorEncoder encoder(8192,0);
+
+//PositionSensorEncoder encoder(8192,4.0f);
 //Inverter inverter(PA_5, PB_10, PB_3, PB_7, 0.02014160156, 0.00005);
-Inverter inverter(PA_10, PA_9, PA_8, PA_11, 0.01007080078, 0.00005);
-CurrentRegulator foc(&inverter, &encoder, .005, .5);
-SVPWM  svpwm(&inverter, 2.0f);
+Inverter inverter(PA_10, PA_9, PA_8, PA_11, 0.01007080078, 0.00005);  //hall motter
+//Inverter inverter(PA_10, PA_9, PA_8, PB_7, 0.01007080078, 0.00005);  //test motter
+PositionSensorSPI spi(2048, 2.75f);
+
+CurrentRegulator foc(&inverter, &spi, .005, .5);  //hall sensor
+TorqueController torqueController(.061f, &foc);
+//CurrentRegulator foc(&inverter, &encoder, .005, .5);    //test motter
+
+//SVPWM  svpwm(&inverter, 2.0f);
 Ticker  testing;
 //Timer t;
 
+/*
 float v_d = 0;
 float v_q = .1;
 float v_alpha = 0;
@@ -22,6 +30,7 @@ float v_beta = 0;
 float v_a = 0;
 float v_b = 0;
 float v_c = 0;
+*/
 
 //SPI spi(PB_15, PB_14, PB_13);
 //GPIOB->MODER = (1 << 8); // set pin 4 to be general purpose output
@@ -42,6 +51,9 @@ extern "C" void TIM2_IRQHandler(void) {
   TIM2->SR = 0x0; // reset the status register
 }
 */
+
+
+
 extern "C" void TIM1_UP_TIM10_IRQHandler(void) {
   // toggle on update event
   if (TIM1->SR & TIM_SR_UIF ) {
@@ -53,6 +65,9 @@ extern "C" void TIM1_UP_TIM10_IRQHandler(void) {
     //GPIOC->ODR ^= (1 << 4); //Toggle pin for debugging
 }
 
+
+
+/*
 void voltage_foc(void){
     float theta = encoder.GetElecPosition();
     InvPark(v_d, v_q, theta, &v_alpha, &v_beta);
@@ -60,17 +75,20 @@ void voltage_foc(void){
     svpwm.Update_DTC(v_a, v_b, v_c);
     //output.write(theta/6.28318530718f);
     }
-   
+*/
 void Loop(void){
     foc.Commutate();
     //voltage_foc();
     }
 
 void PrintStuff(void){
-    float velocity = encoder.GetMechVelocity();
-    float position = encoder.GetMechPosition();
+    //float velocity = encoder.GetMechVelocity();
+    //float position = encoder.GetElecPosition();
+    //float position = encoder.GetMechPosition();
+    float m = spi.GetMechPosition();
+    float e = spi.GetElecPosition();
     //printf("%f, %f;\n\r", position, velocity);
-    printf("%f   %d   %d\n\r", position, TIM3->CNT-0x8000, -2*((int)((TIM3->CR1)>>4)&1)+1);
+    printf("Elec:  %f \n\r", m);
     }
     
 
@@ -91,11 +109,12 @@ int main() {
     //t.start();
     wait(1);
     testing.attach(&Loop, .0001);
+    
     NVIC_SetPriority(TIM5_IRQn, 1);
     //testing.attach(&gen_sine, .01);
     //testing.attach(&PrintStuff, .1);
-    //inverter.SetDTC(.1, 0, 0);
-    inverter.EnableInverter();
+    //inverter.SetDTC(.05, 0, 0);
+    //inverter.EnableInverter();
     //foc.Commutate();
     while(1) {
         //printf("%f\n\r", encoder.GetElecPosition());

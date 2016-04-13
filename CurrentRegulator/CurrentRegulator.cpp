@@ -11,7 +11,7 @@ CurrentRegulator::CurrentRegulator(Inverter *inverter, PositionSensor *position_
     _Inverter = inverter;
     PWM = new SPWM(inverter, 2.0);
     _PositionSensor = position_sensor;
-    IQ_Ref = 2;
+    IQ_Ref = 0;
     ID_Ref = 0;
     V_Q = 0;
     V_D = 0;
@@ -27,7 +27,7 @@ CurrentRegulator::CurrentRegulator(Inverter *inverter, PositionSensor *position_
     I_C = 0;
     I_Alpha = 0;
     I_Beta = 0;
-    //count = 0;
+    count = 0;
     _Kp = Kp;
     _Ki = Ki;
     Q_Integral = 0;
@@ -35,9 +35,9 @@ CurrentRegulator::CurrentRegulator(Inverter *inverter, PositionSensor *position_
     Int_Max = .9;
     DTC_Max = .97;
     //theta_elec = _PositionSensor->GetElecPosition();
-    //pc = new Serial(PA_2, PA_3);
-    //pc->baud(115200);
-
+    pc = new Serial(PA_2, PA_3);
+    pc->baud(115200);
+    
     }
 
 void CurrentRegulator::SendSPI(){
@@ -93,26 +93,20 @@ void CurrentRegulator::SetVoltage(){
     
     
 void CurrentRegulator::Commutate(){
-    //count += 1;
+    count += 1;
     GPIOC->ODR = (1 << 4); //Toggle pin for debugging
     theta_elec = _PositionSensor->GetElecPosition();
+    _PositionSensor->GetMechPosition();
     SampleCurrent(); //Grab most recent current sample
     Update();   //Run control loop
     SetVoltage();   //Set inverter duty cycles
     GPIOC->ODR = (0 << 4); //Toggle pin for debugging
 
     /*
-    if (count==500){
-        //printf("%d %d %d %d\n\r", (int) (I_Q*1000), (int) (I_D*1000), (int) (I_A*1000), int (I_B*1000));
-        pc->putc((unsigned char) (theta_elec*40.0f));
-        pc->putc((unsigned char) (I_A*100.0f+127));
-        pc->putc((unsigned char) (I_B*100.0f+127));
-        pc->putc((unsigned char) (I_Alpha*100.0f+127));
-        pc->putc((unsigned char) (I_Beta*100.0f+127));
-        pc->putc((unsigned char) (I_Q*100.0f+127));
-        pc->putc((unsigned char) (I_D*100.0f+127));
-        pc->putc((0xff));
+    if (count==1000){
+        pc->printf("%f\n\r", _PositionSensor->GetMechPosition());
         count = 0;
         }
         */
+        
     }

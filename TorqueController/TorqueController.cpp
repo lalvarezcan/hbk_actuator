@@ -1,5 +1,5 @@
 
-//cogging torque and torque ripple compensation will go here later
+//cogging torque and torque ripple compensation can go here later
 
 #include "CurrentRegulator.h"
 #include "TorqueController.h"

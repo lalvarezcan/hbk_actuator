@@ -1,6 +1,5 @@
 #ifndef POSITIONSENSOR_H
 #define POSITIONSENSOR_H
-
 class PositionSensor {
 public:
     virtual float GetMechPosition() {return 0.0f;}
@@ -26,4 +25,15 @@ private:
     float _offset, MechPosition, dir, test_pos;
 };
 
+class PositionSensorSPI: public PositionSensor{
+public:
+    PositionSensorSPI(int CPR, float offset);
+    virtual float GetMechPosition();
+    virtual float GetElecPosition();
+private:
+    float _offset, MechPosition;
+    int _CPR, rotations, old_counts;
+    SPI *spi;
+    DigitalOut *cs;
+};
 #endif
