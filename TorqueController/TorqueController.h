@@ -1,5 +1,7 @@
-#ifndef CURRENTRETULATOR_H
-#define CURRENTREGULATOR_H
+#ifndef TORQUECONTROLLER_H
+#define TORQUECONTROLLER_H
+
+#include "CurrentRegulator.h"
 
 class TorqueController{
 public:

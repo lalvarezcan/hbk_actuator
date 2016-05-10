@@ -12,6 +12,7 @@ CurrentRegulator::CurrentRegulator(Inverter *inverter, PositionSensor *position_
     PWM = new SPWM(inverter, 2.0);
     _PositionSensor = position_sensor;
     IQ_Ref = 0;
+    Q_Max = 40.0f;
     ID_Ref = 0;
     V_Q = 0;
     V_D = 0;
@@ -35,8 +36,8 @@ CurrentRegulator::CurrentRegulator(Inverter *inverter, PositionSensor *position_
     Int_Max = .9;
     DTC_Max = .97;
     //theta_elec = _PositionSensor->GetElecPosition();
-    pc = new Serial(PA_2, PA_3);
-    pc->baud(115200);
+    //pc = new Serial(PA_2, PA_3);
+    //pc->baud(115200);
     
     }
 
@@ -45,7 +46,42 @@ void CurrentRegulator::SendSPI(){
     
     }
 
+void CurrentRegulator::Reset(void){
+    IQ_Ref = 0;
+    ID_Ref = 0;
+    V_Q = 0;
+    V_D = 0;
+    V_Alpha = 0;
+    V_Beta = 0;
+    V_A = 0;
+    V_B = 0;
+    V_C = 0;
+    I_Q = 0;
+    I_D = 0;
+    I_A = 0;
+    I_B = 0;
+    I_C = 0;
+    I_Alpha = 0;
+    I_Beta = 0;
+    //pc->printf("%f, %f\n\r", Q_Integral, D_Integral);
+    wait(.03);
+    Q_Integral = 0;
+    D_Integral = 0;    
+    }
+    
 void CurrentRegulator::UpdateRef(float D, float Q){
+    if(Q>Q_Max){
+        Q = Q_Max;
+        }
+    else if(Q<-Q_Max){
+        Q = -Q_Max;
+        }
+    if(D>Q_Max){
+        D = Q_Max;
+        }
+    else if(D<-Q_Max){
+        D = -Q_Max;
+        }
     IQ_Ref = Q;
     ID_Ref = D;
     }
@@ -78,35 +114,31 @@ void CurrentRegulator::Update(){
         else if(D_Integral < -Int_Max) D_Integral = -Int_Max;       
          
         V_Q = Q_Integral + _Kp*Q_Error;
-        V_D = D_Integral + _Kp*D_Error;
-        //V_D = 0;
-        
-        
+        V_D = D_Integral + _Kp*D_Error;        
     }
         
 void CurrentRegulator::SetVoltage(){
     InvPark(V_D, V_Q, theta_elec, &V_Alpha, &V_Beta);
     InvClarke(V_Alpha, V_Beta, &V_A, &V_B, &V_C);
     PWM->Update_DTC(V_A, V_B, V_C);
-    //PWM->Update_DTC(V_Alpha, V_Beta);
     }
     
     
 void CurrentRegulator::Commutate(){
-    count += 1;
-    GPIOC->ODR = (1 << 4); //Toggle pin for debugging
+    //count += 1;
+    //GPIOC->ODR = (1 << 4); //Toggle pin for debugging
     theta_elec = _PositionSensor->GetElecPosition();
     _PositionSensor->GetMechPosition();
     SampleCurrent(); //Grab most recent current sample
     Update();   //Run control loop
     SetVoltage();   //Set inverter duty cycles
-    GPIOC->ODR = (0 << 4); //Toggle pin for debugging
+    //GPIOC->ODR = (0 << 4); //Toggle pin for debugging
 
     /*
     if (count==1000){
         pc->printf("%f\n\r", _PositionSensor->GetMechPosition());
         count = 0;
         }
-        */
+      */  
         
     }

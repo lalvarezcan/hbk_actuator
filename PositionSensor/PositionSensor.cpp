@@ -12,7 +12,7 @@ PositionSensorSPI::PositionSensorSPI(int CPR, float offset){
     spi->format(16, 0);
     cs = new DigitalOut(PA_15);
     cs->write(1);
-    
+    MechOffset = 0;
     }
     
 float PositionSensorSPI::GetMechPosition(){
@@ -27,7 +27,7 @@ float PositionSensorSPI::GetMechPosition(){
         }
     old_counts = response;
     MechPosition = (6.28318530718f * ((float) response+(_CPR*rotations)))/ (float)_CPR;
-    return MechPosition;
+    return MechPosition - MechOffset;
     
     }
 
@@ -38,6 +38,15 @@ float PositionSensorSPI::GetElecPosition(){
     float elec = ((6.28318530718f/(float)_CPR) * (float) ((7*response)%_CPR)) - _offset;
     if(elec < 0) elec += 6.28318530718f;
     return elec;
+    }
+
+float PositionSensorSPI::GetMechVelocity(){
+    return 0;
+    }
+
+void PositionSensorSPI::ZeroPosition(){
+    rotations = 0;
+    MechOffset = GetMechPosition();
     }
     
 
@@ -72,7 +81,7 @@ PositionSensorEncoder::PositionSensorEncoder(int CPR, float offset) {
     TIM3->CNT = 0x000;  //reset the counter before we use it  
     
     // Extra Timer for velocity measurement
-    /*
+    
     __TIM2_CLK_ENABLE();
     TIM3->CR2 = 0x030;  //MMS = 101
     
@@ -88,7 +97,7 @@ PositionSensorEncoder::PositionSensorEncoder(int CPR, float offset) {
     
     
     TIM2->CR1 = 0x01;       //CEN
-    */
+    
     TIM3->CR1   = 0x01;     // CEN
     ZPulse = new InterruptIn(PC_4);
     ZSense = new DigitalIn(PC_4);
@@ -127,9 +136,29 @@ float PositionSensorEncoder::GetElecVelocity(){
     }
     
 float PositionSensorEncoder::GetMechVelocity(){
+    float out = 0;
     float rawPeriod = TIM2->CCR1; //Clock Ticks
+    
     float  dir = -2.0f*(float)(((TIM3->CR1)>>4)&1)+1.0f;    // +/- 1
-    return dir*90000000.0f*(6.28318530718f/(float)_CPR)/rawPeriod; 
+    float meas = dir*90000000.0f*(6.28318530718f/(float)_CPR)/rawPeriod; 
+    
+    if(meas == vel_old){
+        out = .95f*out_old;
+        }
+    else{
+        out = meas;
+        }
+    
+    /*
+    if(abs(vel) < 2.0f){
+        vel = 0;
+        }
+        */
+    vel_old = meas;
+    
+    //out = .5f*out + .5f*out_old;
+    out_old = out;
+    return out;
     }
 
 void PositionSensorEncoder::ZeroEncoderCount(void){

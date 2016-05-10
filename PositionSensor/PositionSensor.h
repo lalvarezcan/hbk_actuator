@@ -4,6 +4,7 @@ class PositionSensor {
 public:
     virtual float GetMechPosition() {return 0.0f;}
     virtual float GetElecPosition() {return 0.0f;}
+    virtual float GetMechVelocity() {return 0.0f;}
 };
   
   
@@ -22,7 +23,7 @@ private:
     virtual void ZeroEncoderCountDown(void);
     int _CPR, flag, rotations;
     //int state;
-    float _offset, MechPosition, dir, test_pos;
+    float _offset, MechPosition, dir, test_pos, vel_old, out_old;
 };
 
 class PositionSensorSPI: public PositionSensor{
@@ -30,8 +31,10 @@ public:
     PositionSensorSPI(int CPR, float offset);
     virtual float GetMechPosition();
     virtual float GetElecPosition();
+    virtual float GetMechVelocity();
+    virtual void ZeroPosition();
 private:
-    float _offset, MechPosition;
+    float _offset, MechPosition, MechOffset;
     int _CPR, rotations, old_counts;
     SPI *spi;
     DigitalOut *cs;

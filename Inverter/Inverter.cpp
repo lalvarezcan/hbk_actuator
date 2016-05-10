@@ -62,6 +62,8 @@ Inverter::Inverter(PinName PinA, PinName PinB, PinName PinC, PinName PinEnable, 
      SetDTC(0.0f, 0.0f, 0.0f);
      wait(.2);
      ZeroCurrent();
+     wait(.1);
+     DisableInverter();
     }
 
 void Inverter::SetDTC(float DTC_A, float DTC_B, float DTC_C){
@@ -85,10 +87,11 @@ void Inverter::ZeroCurrent(){
         I_B_Offset += ADC1->DR;
         I_C_Offset += ADC2->DR;
         ADC1->CR2  |= 0x40000000; 
+        wait(.0001);
         }
     I_B_Offset = I_B_Offset/1000.0f;
     I_C_Offset = I_C_Offset/1000.0f;
-    printf("B_Offset:  %f     C_Offset:  %f\n\r", I_B_Offset, I_C_Offset);
+    //printf("B_Offset:  %f     C_Offset:  %f\n\r", I_B_Offset, I_C_Offset);
     }
 
 void Inverter::GetCurrent(float *A, float *B, float *C){
