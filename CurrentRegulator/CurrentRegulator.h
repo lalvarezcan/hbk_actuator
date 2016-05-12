@@ -21,7 +21,7 @@ class CurrentRegulator{
         Inverter* _Inverter;
         PositionSensor* _PositionSensor;
         SVM* PWM;
-        Serial* pc;
+        //Serial* pc;
         int count;
             
     

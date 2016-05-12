@@ -10,7 +10,7 @@ public:
   
 class PositionSensorEncoder: public PositionSensor {
 public:
-    PositionSensorEncoder(int CPR, float offset);
+    PositionSensorEncoder(int CPR, float offset, int ppairs);
     virtual float GetMechPosition();
     virtual float GetElecPosition();
     virtual float GetMechVelocity();
@@ -21,21 +21,21 @@ private:
     //DigitalOut *ZTest;
     virtual void ZeroEncoderCount(void);
     virtual void ZeroEncoderCountDown(void);
-    int _CPR, flag, rotations;
+    int _CPR, flag, rotations, _ppairs;
     //int state;
     float _offset, MechPosition, dir, test_pos, vel_old, out_old;
 };
 
 class PositionSensorSPI: public PositionSensor{
 public:
-    PositionSensorSPI(int CPR, float offset);
+    PositionSensorSPI(int CPR, float offset, int ppairs);
     virtual float GetMechPosition();
     virtual float GetElecPosition();
     virtual float GetMechVelocity();
     virtual void ZeroPosition();
 private:
     float _offset, MechPosition, MechOffset;
-    int _CPR, rotations, old_counts;
+    int _CPR, rotations, old_counts, _ppairs;
     SPI *spi;
     DigitalOut *cs;
 };

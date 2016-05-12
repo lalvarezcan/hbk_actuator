@@ -25,13 +25,15 @@ Serial pc(PA_2, PA_3);
 //Inverter inverter(PA_5, PB_10, PB_3, PB_7, 0.02014160156, 0.00005);
 Inverter inverter(PA_10, PA_9, PA_8, PA_11, 0.02014160156, 0.00005);  //hall motter
 //Inverter inverter(PA_10, PA_9, PA_8, PB_7, 0.01007080078, 0.00005);  //test motter
-PositionSensorSPI spi(2048, 2.75f);   ///1  I really need an eeprom or something to store this....
-//PositionSensorSPI spi(2048, 1.34f); ///2
-//PositionSensorSPI spi(2048, 1);
+//PositionSensorSPI spi(2048, 2.75f, 7);   ///1  I really need an eeprom or something to store this....
+//PositionSensorSPI spi(2048, 1.34f, 7); ///2
+PositionSensorSPI spi(2048, 3.0, 21);
 int motorID = 40; ///1
 //int motorID = 50;  ///2
 
-PositionSensorEncoder encoder(1024, 0);
+//PositionSensorEncoder encoder(1024, 0, 7);
+PositionSensorEncoder encoder(1024, 0, 21);
+
 
 CurrentRegulator foc(&inverter, &spi, .005, .5);  //hall sensor
 TorqueController torqueController(.031f, &foc);
@@ -88,6 +90,43 @@ extern "C" void TIM1_UP_TIM10_IRQHandler(void) {
     //GPIOC->ODR ^= (1 << 4); //Toggle pin for debugging
 }
 
+
+void hk_start(void){
+    inverter.SetDTC(0, 0, 0);
+    inverter.EnableInverter();
+    for(int i = 0; i<120; i++){
+        torqueController.SetTorque(.4);
+        wait(0.000956);
+        torqueController.SetTorque(-.4);
+        wait(0.000956);
+        }
+    for(int i = 0; i<120; i++){
+        torqueController.SetTorque(.4);
+        wait(0.0008513);
+        torqueController.SetTorque(-.4);
+        wait(0.0008513);
+        }    
+    for(int i = 0; i<120; i++){
+        torqueController.SetTorque(.4);
+        wait(0.00075843);
+        torqueController.SetTorque(-.4);
+        wait(0.00075843);
+        }   
+        torqueController.SetTorque(0);
+    wait(.4);
+    for (int j = 0; j<3; j++){
+        for(int i = 0; i<120; i++){
+            torqueController.SetTorque(.4);
+            wait(0.000956);
+            torqueController.SetTorque(-.4);
+            wait(0.000956);
+            }   
+            torqueController.SetTorque(0);
+            wait(.2);
+
+        }
+    
+    }
 
 
 /*
@@ -167,8 +206,8 @@ void read(void){
          
 void Loop(void){
     
-    impedanceController.SetImpedance(cmd_float[1], cmd_float[2], cmd_float[0]);
-    //impedanceController.SetImpedance(-.4, -0.006, 0);
+    //impedanceController.SetImpedance(cmd_float[1], cmd_float[2], cmd_float[0]);
+    impedanceController.SetImpedance(-.04, -0.00, 0);
 
     count = count+1;
     
@@ -191,8 +230,8 @@ void PrintStuff(void){
     //float position = encoder.GetElecPosition();
     //float position = encoder.GetMechPosition();
     //float m = spi.GetMechPosition();
-    float e = spi.GetElecPosition();
-    printf("%f\n\r", e);
+    //float e = spi.GetElecPosition();
+    //printf("%f\n\r", e);
     //printf("%f   %f   %f   %f \n\r", m, cmd_float[0], cmd_float[1], cmd_float[2]);
     //printf("%d   %d   %d\n\r", raw[0], raw[1], raw[2]);
     }
@@ -225,7 +264,8 @@ int main() {
     wait(.1);
     inverter.SetDTC(0.2, 0.2, 0.2);
     inverter.EnableInverter();
-    foc.Reset();
+    hk_start();
+    //foc.Reset();
     testing.attach(&Loop, .0001);
     NVIC_SetPriority(TIM5_IRQn, 2);
     pc.baud(115200);

@@ -3,9 +3,10 @@
 #include "PositionSensor.h"
 //#include <math.h>
 
-PositionSensorSPI::PositionSensorSPI(int CPR, float offset){
+PositionSensorSPI::PositionSensorSPI(int CPR, float offset, int ppairs){
     //_CPR = CPR;
-    _CPR = 2048;
+    _CPR = CPR;
+    _ppairs = ppairs;
     _offset = offset;
     rotations = 0;
     spi = new SPI(PC_12, PC_11, PC_10);
@@ -35,7 +36,7 @@ float PositionSensorSPI::GetElecPosition(){
     cs->write(0);
     int response = spi->write(0)>>4;
     cs->write(1);
-    float elec = ((6.28318530718f/(float)_CPR) * (float) ((7*response)%_CPR)) - _offset;
+    float elec = ((6.28318530718f/(float)_CPR) * (float) ((_ppairs*response)%_CPR)) - _offset;
     if(elec < 0) elec += 6.28318530718f;
     return elec;
     }
@@ -51,7 +52,8 @@ void PositionSensorSPI::ZeroPosition(){
     
 
     
-PositionSensorEncoder::PositionSensorEncoder(int CPR, float offset) {
+PositionSensorEncoder::PositionSensorEncoder(int CPR, float offset, int ppairs) {
+    _ppairs = ppairs;
     _CPR = CPR;
     _offset = offset;
     MechPosition = 0;
@@ -124,7 +126,7 @@ float PositionSensorEncoder::GetMechPosition() {        //returns rotor angle in
 
 float PositionSensorEncoder::GetElecPosition() {        //returns rotor electrical angle in radians.
     int raw = TIM3->CNT;
-    float elec = ((6.28318530718f/(float)_CPR) * (float) ((7*raw)%_CPR)) - _offset;
+    float elec = ((6.28318530718f/(float)_CPR) * (float) ((_ppairs*raw)%_CPR)) - _offset;
     if(elec < 0) elec += 6.28318530718f;
     return elec;
 }
@@ -132,7 +134,7 @@ float PositionSensorEncoder::GetElecPosition() {        //returns rotor electric
 float PositionSensorEncoder::GetElecVelocity(){
     float rawPeriod = TIM2->CCR1; //Clock Ticks
     float  dir = (((TIM3->CR1)>>4)&1)*2-1;    // +/- 1
-    return dir*7*90000000.0f*(6.28318530718f/(float)_CPR)/rawPeriod;
+    return dir*_ppairs*90000000.0f*(6.28318530718f/(float)_CPR)/rawPeriod;
     }
     
 float PositionSensorEncoder::GetMechVelocity(){

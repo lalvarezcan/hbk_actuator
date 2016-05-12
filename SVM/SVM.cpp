@@ -10,6 +10,7 @@ SPWM::SPWM(Inverter *inverter, float V_Bus){
     _V_Bus = V_Bus;
     }
 
+//sinusoidal PWM
 void SPWM::Update_DTC(float V_A, float V_B, float V_C){
     float DTC_A = V_A/_V_Bus + .5f;
     float DTC_B = V_B/_V_Bus + .5f;
@@ -29,6 +30,7 @@ SVPWM::SVPWM(Inverter *inverter, float V_Bus){
     _V_Bus = V_Bus;
     }
     
+//space vector pwm (better bus utilization)
 void SVPWM::Update_DTC(float V_A, float V_B, float V_C){
     
     float Voff = (min(V_A, V_B, V_C) + max(V_A, V_B, V_C))/2.0f;

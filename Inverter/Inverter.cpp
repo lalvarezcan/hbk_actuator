@@ -58,6 +58,8 @@ Inverter::Inverter(PinName PinA, PinName PinB, PinName PinC, PinName PinEnable, 
      DAC->CR |= 0x00000001; // DAC control reg, both channels ON
      GPIOA->MODER |= 0x00000300; // PA04 as analog output   
      
+     
+     //Enabled pin must be on for current sensors to turn on
      EnableInverter();
      SetDTC(0.0f, 0.0f, 0.0f);
      wait(.2);
