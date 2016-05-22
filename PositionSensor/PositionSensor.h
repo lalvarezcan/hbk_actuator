@@ -32,6 +32,7 @@ public:
     virtual float GetMechPosition();
     virtual float GetElecPosition();
     virtual float GetMechVelocity();
+    virtual int GetRawPosition();
     virtual void ZeroPosition();
 private:
     float _offset, MechPosition, MechOffset;

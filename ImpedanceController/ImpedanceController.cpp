@@ -18,7 +18,5 @@ ImpedanceController::ImpedanceController(TorqueController *torqueController, Pos
     
     _torqueController->SetTorque(output);
     
-    
-
     }
     

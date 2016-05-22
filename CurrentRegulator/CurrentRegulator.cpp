@@ -9,7 +9,7 @@ using namespace Transforms;
 
 CurrentRegulator::CurrentRegulator(Inverter *inverter, PositionSensor *position_sensor, float Kp, float Ki){
     _Inverter = inverter;
-    PWM = new SPWM(inverter, 2.0);
+    PWM = new SVPWM(inverter, 2.0);
     _PositionSensor = position_sensor;
     IQ_Ref = 0;
     Q_Max = 40.0f;
@@ -45,7 +45,11 @@ void CurrentRegulator::SendSPI(){
     
     
     }
-
+    
+float CurrentRegulator::GetQ(){
+    return I_Q;
+    }
+    
 void CurrentRegulator::Reset(void){
     IQ_Ref = 0;
     ID_Ref = 0;
@@ -139,6 +143,8 @@ void CurrentRegulator::Commutate(){
         pc->printf("%f\n\r", _PositionSensor->GetMechPosition());
         count = 0;
         }
-      */  
-        
+
     }
+    
+      */  
+      }

@@ -15,7 +15,15 @@ PositionSensorSPI::PositionSensorSPI(int CPR, float offset, int ppairs){
     cs->write(1);
     MechOffset = 0;
     }
+
+int PositionSensorSPI::GetRawPosition(){
+        cs->write(0);
+    int response = spi->write(0)>>4;
+    cs->write(1);
+    return response;
+    }
     
+
 float PositionSensorSPI::GetMechPosition(){
     cs->write(0);
     int response = spi->write(0)>>4;
@@ -28,8 +36,8 @@ float PositionSensorSPI::GetMechPosition(){
         }
     old_counts = response;
     MechPosition = (6.28318530718f * ((float) response+(_CPR*rotations)))/ (float)_CPR;
-    return MechPosition - MechOffset;
-    
+    //return MechPosition - MechOffset;
+    return MechPosition;
     }
 
 float PositionSensorSPI::GetElecPosition(){
@@ -143,7 +151,7 @@ float PositionSensorEncoder::GetMechVelocity(){
     
     float  dir = -2.0f*(float)(((TIM3->CR1)>>4)&1)+1.0f;    // +/- 1
     float meas = dir*90000000.0f*(6.28318530718f/(float)_CPR)/rawPeriod; 
-    
+    out = meas;
     if(meas == vel_old){
         out = .95f*out_old;
         }
