@@ -110,7 +110,7 @@ void CurrentRegulator::SampleCurrent(){
 void CurrentRegulator::Update(){
         float Q_Error = IQ_Ref - I_Q;
         float D_Error = ID_Ref - I_D;
-        float w_elec = _velocitySensor.GetElecVelocity();
+        float w_elec = _VelocitySensor->GetElecVelocity();
         
         Q_Integral += Q_Error*_Ki*_Kp;
         D_Integral += D_Error*_Ki*_Kp;

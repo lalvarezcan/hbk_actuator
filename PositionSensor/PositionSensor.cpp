@@ -139,9 +139,7 @@ float PositionSensorEncoder::GetElecPosition() {        //returns rotor electric
     return elec;
 }
 
-float PositionSensorEncoder::GetElecVelocity(){
-    return _ppairs*GetMechVelocity();
-    }
+
     
 float PositionSensorEncoder::GetMechVelocity(){
     float out = 0;
@@ -157,18 +155,15 @@ float PositionSensorEncoder::GetMechVelocity(){
         out = meas;
         }
     
-    /*
-    if(abs(vel) < 2.0f){
-        vel = 0;
-        }
-        */
     vel_old = meas;
-    
-    //out = .5f*out + .5f*out_old;
     out_old = out;
     return out;
     }
-
+    
+float PositionSensorEncoder::GetElecVelocity(){
+    return _ppairs*GetMechVelocity();
+    }
+    
 void PositionSensorEncoder::ZeroEncoderCount(void){
     if (ZSense->read() == 1 & flag == 0){
         if (ZSense->read() == 1){

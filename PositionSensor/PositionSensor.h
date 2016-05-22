@@ -5,6 +5,7 @@ public:
     virtual float GetMechPosition() {return 0.0f;}
     virtual float GetElecPosition() {return 0.0f;}
     virtual float GetMechVelocity() {return 0.0f;}
+    virtual float GetElecVelocity() {return 0.0f;}
 };
   
   
