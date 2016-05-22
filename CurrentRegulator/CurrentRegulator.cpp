@@ -7,10 +7,11 @@
 
 using namespace Transforms;
 
-CurrentRegulator::CurrentRegulator(Inverter *inverter, PositionSensor *position_sensor, float Kp, float Ki){
+CurrentRegulator::CurrentRegulator(Inverter *inverter, PositionSensor *position_sensor, PositionSensor *velocity_sensor, float L, float Kp, float Ki){
     _Inverter = inverter;
     PWM = new SVPWM(inverter, 2.0);
     _PositionSensor = position_sensor;
+    _VelocitySensor = velocity_sensor;
     IQ_Ref = 0;
     Q_Max = 40.0f;
     ID_Ref = 0;
@@ -29,6 +30,7 @@ CurrentRegulator::CurrentRegulator(Inverter *inverter, PositionSensor *position_
     I_Alpha = 0;
     I_Beta = 0;
     count = 0;
+    _L = L;
     _Kp = Kp;
     _Ki = Ki;
     Q_Integral = 0;
@@ -108,6 +110,7 @@ void CurrentRegulator::SampleCurrent(){
 void CurrentRegulator::Update(){
         float Q_Error = IQ_Ref - I_Q;
         float D_Error = ID_Ref - I_D;
+        float w_elec = _velocitySensor.GetElecVelocity();
         
         Q_Integral += Q_Error*_Ki*_Kp;
         D_Integral += D_Error*_Ki*_Kp;
@@ -118,7 +121,9 @@ void CurrentRegulator::Update(){
         else if(D_Integral < -Int_Max) D_Integral = -Int_Max;       
          
         V_Q = Q_Integral + _Kp*Q_Error;
-        V_D = D_Integral + _Kp*D_Error;        
+        //V_Q = V_Q - w_elec*I_D;
+        V_D = D_Integral + _Kp*D_Error;     
+        //V_D = V_D + w_elec*I_Q;   //decoupling needs moar testing
     }
         
 void CurrentRegulator::SetVoltage(){

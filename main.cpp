@@ -28,7 +28,7 @@ PositionSensorEncoder encoder(1024, 0, 7);
 
 
 
-CurrentRegulator foc(&inverter, &spi, .005, .5);    
+CurrentRegulator foc(&inverter, &spi, &encoder, 0.000033, .005, .5);    
 TorqueController torqueController(.031f, &foc);
 ImpedanceController impedanceController(&torqueController, &spi, &encoder);
 

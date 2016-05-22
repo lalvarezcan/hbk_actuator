@@ -140,9 +140,7 @@ float PositionSensorEncoder::GetElecPosition() {        //returns rotor electric
 }
 
 float PositionSensorEncoder::GetElecVelocity(){
-    float rawPeriod = TIM2->CCR1; //Clock Ticks
-    float  dir = (((TIM3->CR1)>>4)&1)*2-1;    // +/- 1
-    return dir*_ppairs*90000000.0f*(6.28318530718f/(float)_CPR)/rawPeriod;
+    return _ppairs*GetMechVelocity();
     }
     
 float PositionSensorEncoder::GetMechVelocity(){
