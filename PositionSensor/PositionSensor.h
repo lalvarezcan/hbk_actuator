@@ -27,9 +27,9 @@ private:
     float _offset, MechPosition, dir, test_pos, vel_old, out_old;
 };
 
-class PositionSensorSPI: public PositionSensor{
+class PositionSensorMA700: public PositionSensor{
 public:
-    PositionSensorSPI(int CPR, float offset, int ppairs);
+    PositionSensorMA700(int CPR, float offset, int ppairs);
     virtual float GetMechPosition();
     virtual float GetElecPosition();
     virtual float GetMechVelocity();
@@ -40,5 +40,22 @@ private:
     int _CPR, rotations, old_counts, _ppairs;
     SPI *spi;
     DigitalOut *cs;
+};
+
+class PositionSensorAM5147: public PositionSensor{
+public:
+    PositionSensorAM5147(int CPR, float offset, int ppairs);
+    virtual float GetMechPosition();
+    virtual float GetElecPosition();
+    virtual float GetMechVelocity();
+    virtual int GetRawPosition();
+    virtual void ZeroPosition();
+private:
+    float _offset, MechPosition, MechOffset;
+    int _CPR, rotations, old_counts, _ppairs;
+    SPI *spi;
+    DigitalOut *cs;
+    int readAngleCmd;
+
 };
 #endif

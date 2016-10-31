@@ -9,10 +9,10 @@ void Transforms::Park(float alpha, float beta, float theta, float *d, float *q){
     //float sine = sin(theta);
     float cosine = FastCos(theta);
     float sine = FastSin(theta);
-    *d = alpha*cosine - beta*sine;      //This is a hack - effectively using -beta instead of beta
-    *q = -beta*cosine - alpha*sine;     //I think because I'm using pi as the d axis offset instead of zero, but I need to investigate more.
-    //*d = alpha*cosine + beta*sine;
-    //*q = beta*cosine - alpha*sine;
+    //*d = alpha*cosine - beta*sine;      //This is a hack - effectively using -beta instead of beta
+    //*q = -beta*cosine - alpha*sine;     //I think because I'm using pi as the d axis offset instead of zero, but I need to investigate more.
+    *d = alpha*cosine + beta*sine;
+    *q = beta*cosine - alpha*sine;
     //DAC->DHR12R1 = (int) (*q*49.648f) + 2048;
     //DAC->DHR12R1 = (int) (*q*2048.0f) + 2048;
     }

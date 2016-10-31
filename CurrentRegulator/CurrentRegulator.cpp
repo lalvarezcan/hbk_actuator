@@ -29,6 +29,8 @@ CurrentRegulator::CurrentRegulator(Inverter *inverter, PositionSensor *position_
     I_C = 0;
     I_Alpha = 0;
     I_Beta = 0;
+    IQ_Old = 0;
+    ID_Old = 0;
     count = 0;
     _L = L;
     _Kp = Kp;
@@ -38,8 +40,7 @@ CurrentRegulator::CurrentRegulator(Inverter *inverter, PositionSensor *position_
     Int_Max = .9;
     DTC_Max = .97;
     //theta_elec = _PositionSensor->GetElecPosition();
-    //pc = new Serial(PA_2, PA_3);
-    //pc->baud(115200);
+
     
     }
 
@@ -95,7 +96,14 @@ void CurrentRegulator::UpdateRef(float D, float Q){
 void CurrentRegulator::SampleCurrent(){
     _Inverter->GetCurrent(&I_A, &I_B, &I_C);
     Clarke(I_A, I_B, &I_Alpha, &I_Beta);
-    Park(I_Alpha, I_Beta, theta_elec, &I_D, &I_Q);
+    float ID_Sample, IQ_Sample;
+    //Park(I_Alpha, I_Beta, theta_elec, &I_D, &I_Q);
+    
+    Park(I_Alpha, I_Beta, theta_elec, &ID_Sample, &IQ_Sample);    
+    I_D = .5f*ID_Sample + .5f*ID_Old;
+    I_Q = .5f*IQ_Sample + .5f*IQ_Old;
+    ID_Old = I_D;
+    IQ_Old = I_Q;
     //count += 1;
     //if(count > 10000) {
     //    count=0;
@@ -134,7 +142,7 @@ void CurrentRegulator::SetVoltage(){
     
     
 void CurrentRegulator::Commutate(){
-    //count += 1;
+    count += 1;
     //GPIOC->ODR = (1 << 4); //Toggle pin for debugging
     theta_elec = _PositionSensor->GetElecPosition();
     _PositionSensor->GetMechPosition();
@@ -143,13 +151,13 @@ void CurrentRegulator::Commutate(){
     SetVoltage();   //Set inverter duty cycles
     //GPIOC->ODR = (0 << 4); //Toggle pin for debugging
 
-    /*
+    
     if (count==1000){
-        pc->printf("%f\n\r", _PositionSensor->GetMechPosition());
+        //printf("%f\n\r", V_A);
         count = 0;
         }
 
-    }
     
-      */  
+    
+      
       }

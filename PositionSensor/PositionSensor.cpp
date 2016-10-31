@@ -3,7 +3,7 @@
 #include "PositionSensor.h"
 //#include <math.h>
 
-PositionSensorSPI::PositionSensorSPI(int CPR, float offset, int ppairs){
+PositionSensorMA700::PositionSensorMA700(int CPR, float offset, int ppairs){
     //_CPR = CPR;
     _CPR = CPR;
     _ppairs = ppairs;
@@ -16,7 +16,7 @@ PositionSensorSPI::PositionSensorSPI(int CPR, float offset, int ppairs){
     MechOffset = 0;
     }
 
-int PositionSensorSPI::GetRawPosition(){
+int PositionSensorMA700::GetRawPosition(){
         cs->write(0);
     int response = spi->write(0)>>4;
     cs->write(1);
@@ -24,7 +24,7 @@ int PositionSensorSPI::GetRawPosition(){
     }
     
 
-float PositionSensorSPI::GetMechPosition(){
+float PositionSensorMA700::GetMechPosition(){
     cs->write(0);
     int response = spi->write(0)>>4;
     cs->write(1);
@@ -40,7 +40,7 @@ float PositionSensorSPI::GetMechPosition(){
     return MechPosition;
     }
 
-float PositionSensorSPI::GetElecPosition(){
+float PositionSensorMA700::GetElecPosition(){
     cs->write(0);
     int response = spi->write(0)>>4;
     cs->write(1);
@@ -49,16 +49,74 @@ float PositionSensorSPI::GetElecPosition(){
     return elec;
     }
 
-float PositionSensorSPI::GetMechVelocity(){
+float PositionSensorMA700::GetMechVelocity(){
     return 0;
     }
 
-void PositionSensorSPI::ZeroPosition(){
+void PositionSensorMA700::ZeroPosition(){
     rotations = 0;
     MechOffset = GetMechPosition();
     }
     
+PositionSensorAM5147::PositionSensorAM5147(int CPR, float offset, int ppairs){
+    //_CPR = CPR;
+    _CPR = CPR;
+    _ppairs = ppairs;
+    _offset = offset;
+    rotations = 0;
+    spi = new SPI(PC_12, PC_11, PC_10);
+    spi->format(16, 1);
+    spi->frequency(10000000);
+    cs = new DigitalOut(PA_15);
+    cs->write(1);
+    readAngleCmd = 0xffff;
+    MechOffset = 0;
+    }
 
+int PositionSensorAM5147::GetRawPosition(){
+    cs->write(0);
+    int angle = spi->write(0xffff);
+    angle &= 0x3FFF;    //Extract last 14 bits
+    cs->write(1);    
+    return angle;
+    }
+    
+
+float PositionSensorAM5147::GetMechPosition(){
+    cs->write(0);
+    int angle = spi->write(readAngleCmd);
+    angle &= 0x3FFF;    //Extract last 14 bits
+    cs->write(1);
+    if(angle - old_counts > _CPR/4){
+        rotations -= 1;
+        }
+    else if (angle - old_counts < -_CPR/4){
+        rotations += 1;
+        }
+    old_counts = angle;
+    MechPosition = (6.28318530718f * ((float) angle+(_CPR*rotations)))/ (float)_CPR;
+    //return MechPosition - MechOffset;
+    return MechPosition;
+    }
+
+float PositionSensorAM5147::GetElecPosition(){
+    cs->write(0);
+    int angle = spi->write(readAngleCmd);
+    angle &= 0x3FFF;    //Extract last 14 bits
+    cs->write(1);
+    float elec = ((6.28318530718f/(float)_CPR) * (float) ((_ppairs*angle)%_CPR)) - _offset;
+    if(elec < 0) elec += 6.28318530718f;
+    return elec;
+    }
+
+float PositionSensorAM5147::GetMechVelocity(){
+    return 0;
+    }
+
+void PositionSensorAM5147::ZeroPosition(){
+    rotations = 0;
+    MechOffset = GetMechPosition();
+    }
     
 PositionSensorEncoder::PositionSensorEncoder(int CPR, float offset, int ppairs) {
     _ppairs = ppairs;
@@ -149,7 +207,7 @@ float PositionSensorEncoder::GetMechVelocity(){
     float meas = dir*90000000.0f*(6.28318530718f/(float)_CPR)/rawPeriod; 
     out = meas;
     if(meas == vel_old){
-        out = .95f*out_old;
+        out = .99f*out_old;
         }
     else{
         out = meas;

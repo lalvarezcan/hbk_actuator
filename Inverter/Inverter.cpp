@@ -37,7 +37,8 @@ Inverter::Inverter(PinName PinA, PinName PinB, PinName PinC, PinName PinEnable, 
     //PWM Setup
 
     TIM1->PSC = 0x0; // no prescaler, timer counts up in sync with the peripheral clock
-    TIM1->ARR = 0x1194; // 20 Khz
+    //TIM1->ARR = 0x1194; // 20 Khz
+    TIM1->ARR = 0x8CA;
     TIM1->CCER |= ~(TIM_CCER_CC1NP); //Interupt when low side is on.
     TIM1->CR1 |= TIM_CR1_CEN;     
     
@@ -86,8 +87,8 @@ void Inverter::ZeroCurrent(){
     I_B_Offset = 0;
     I_C_Offset = 0;
     for (int i=0; i < 1000; i++){
-        I_B_Offset += ADC1->DR;
-        I_C_Offset += ADC2->DR;
+        I_B_Offset += ADC2->DR;
+        I_C_Offset += ADC1->DR;
         ADC1->CR2  |= 0x40000000; 
         wait(.0001);
         }
@@ -100,13 +101,14 @@ void Inverter::GetCurrent(float *A, float *B, float *C){
     *A = I_A;
     *B = I_B;
     *C = I_C;
+    //printf("I_A: %f    I_B: %f   I_C: %f\n\r", I_A, I_B, I_C);
     }
 
 void Inverter::SampleCurrent(void){
  //   Dbg->write(1);
     GPIOC->ODR ^= (1 << 4); //Toggle pin for debugging
-    I_B = _I_Scale*((float) (ADC1->DR) -  I_B_Offset);
-    I_C = _I_Scale*((float) (ADC2->DR)-  I_C_Offset);
+    I_B = _I_Scale*((float) (ADC2->DR) -  I_B_Offset);
+    I_C = _I_Scale*((float) (ADC1->DR)-  I_C_Offset);
     I_A = -I_B - I_C;
     //DAC->DHR12R1 = ADC2->DR; 
     //DAC->DHR12R1 = TIM3->CNT>>2;//ADC2->DR; // pass ADC -> DAC, also clears EOC flag
