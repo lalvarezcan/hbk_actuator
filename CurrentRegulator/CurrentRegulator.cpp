@@ -100,8 +100,8 @@ void CurrentRegulator::SampleCurrent(){
     //Park(I_Alpha, I_Beta, theta_elec, &I_D, &I_Q);
     
     Park(I_Alpha, I_Beta, theta_elec, &ID_Sample, &IQ_Sample);    
-    I_D = .5f*ID_Sample + .5f*ID_Old;
-    I_Q = .5f*IQ_Sample + .5f*IQ_Old;
+    I_D = 1.0f*ID_Sample + 0.0f*ID_Old;
+    I_Q = 1.0f*IQ_Sample + 0.0f*IQ_Old;
     ID_Old = I_D;
     IQ_Old = I_Q;
     //count += 1;

@@ -19,15 +19,15 @@ int buff[8];
 Serial pc(PA_2, PA_3);
 
 Inverter inverter(PA_10, PA_9, PA_8, PA_11, 0.02014160156, 0.00005);  //hall motor
-PositionSensorAM5147 spi(16384, 2.7f, 7);   ///1  I really need an eeprom or something to store this....
+PositionSensorAM5147 spi(16384, 1.65f, 21);   ///1  I really need an eeprom or something to store this....
 //PositionSensorSPI spi(2048, 1.34f, 7); ///2
 
 
-PositionSensorEncoder encoder(4096, 0, 7); 
+PositionSensorEncoder encoder(4096, 0, 21); 
 
 
 
-CurrentRegulator foc(&inverter, &spi, &encoder, 0.000033, .005, .5);    
+CurrentRegulator foc(&inverter, &spi, &encoder, 0.000033, .005, .55);    
 TorqueController torqueController(.031f, &foc);
 ImpedanceController impedanceController(&torqueController, &spi, &encoder);
 
@@ -49,9 +49,9 @@ int count = 0;
 void Loop(void){
     count++;
     //impedanceController.SetImpedance(cmd_float[1], cmd_float[2], cmd_float[0]);
-    impedanceController.SetImpedance(.1, -0.01, 0);
+    //impedanceController.SetImpedance(.1, -0.01, 0);
     
-    //torqueController.SetTorque(-.03);
+    torqueController.SetTorque(.1);
     //foc.Commutate();
     //voltage_foc();
     if(count>2000){
