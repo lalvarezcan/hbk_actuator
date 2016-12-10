@@ -1,3 +1,15 @@
+const unsigned int BOARDNUM = 0x2;
+
+//const unsigned int a_id =                            
+
+const unsigned int TX_ID = 0x0100;
+    
+const unsigned int a_ID = (BOARDNUM<<8) + 0x7;
+const unsigned int b_ID = (BOARDNUM<<8) + 0x8;
+const unsigned int c_ID = (BOARDNUM<<8) + 0x9;
+
+
+#include "CANnucleo.h"
 #include "mbed.h"
 #include "PositionSensor.h"
 #include "Inverter.h"
@@ -8,9 +20,51 @@
 #include "TorqueController.h"
 #include "ImpedanceController.h"
 
+
 using namespace FastMath;
 using namespace Transforms;
 
+
+CANnucleo::CAN          can(PB_8, PB_9);  // CAN Rx pin name, CAN Tx pin name
+CANnucleo::CANMessage   rxMsg;
+CANnucleo::CANMessage   txMsg;
+int                     ledState;
+Timer                   timer;
+Ticker                  sendCAN;
+int                     counter = 0;
+volatile bool           msgAvailable = false;
+
+int a1, b1, c1;
+/**
+ * @brief   'CAN receive-complete' interrup handler.
+ * @note    Called on arrival of new CAN message.
+ *          Keep it as short as possible.
+ * @param   
+ * @retval  
+ */
+void onMsgReceived() {
+    msgAvailable = true;
+    //printf("ping\n\r");
+}
+
+
+void sendCMD(int TX_addr, int val){
+    txMsg.clear();      //clear Tx message storage
+    txMsg.id = TX_addr;
+    txMsg << val;
+    can.write(txMsg);
+    //wait(.1);
+    
+    }
+    
+void comLoop(void){
+    sendCMD(TX_ID, a1);
+    
+    printf("%d   %d   %d \n\r", a1, b1, c1);
+    //sendCMD(TX_ID+b_ID, b1);
+    //sendCMD(TX_ID+c_ID, c1);
+    }
+    
 int id[3] = {0};
 float cmd_float[3] = {0.0f};
 int raw[3] = {0};
