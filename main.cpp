@@ -4,9 +4,8 @@ const unsigned int BOARDNUM = 0x2;
 
 const unsigned int TX_ID = 0x0100;
     
-const unsigned int a_ID = (BOARDNUM<<8) + 0x7;
-const unsigned int b_ID = (BOARDNUM<<8) + 0x8;
-const unsigned int c_ID = (BOARDNUM<<8) + 0x9;
+const unsigned int cmd_ID = (BOARDNUM<<8) + 0x7;
+
 
 
 #include "CANnucleo.h"
@@ -29,12 +28,10 @@ CANnucleo::CAN          can(PB_8, PB_9);  // CAN Rx pin name, CAN Tx pin name
 CANnucleo::CANMessage   rxMsg;
 CANnucleo::CANMessage   txMsg;
 int                     ledState;
-Timer                   timer;
-Ticker                  sendCAN;
 int                     counter = 0;
+int canCmd = 1000;
 volatile bool           msgAvailable = false;
 
-int a1, b1, c1;
 /**
  * @brief   'CAN receive-complete' interrup handler.
  * @note    Called on arrival of new CAN message.
@@ -47,7 +44,6 @@ void onMsgReceived() {
     //printf("ping\n\r");
 }
 
-
 void sendCMD(int TX_addr, int val){
     txMsg.clear();      //clear Tx message storage
     txMsg.id = TX_addr;
@@ -57,10 +53,22 @@ void sendCMD(int TX_addr, int val){
     
     }
     
-void comLoop(void){
-    sendCMD(TX_ID, a1);
+void readCAN(void){
+    if(msgAvailable) { 
+    msgAvailable = false;               // reset flag for next use
+    can.read(rxMsg);                    // read message into Rx message storage
+    // Filtering performed by software:           
+    if(rxMsg.id == cmd_ID) {             // See comments in CAN.cpp for filtering performed by hardware
+            rxMsg >> canCmd;  
+            }             // extract first data item
+        }
+        }
     
-    printf("%d   %d   %d \n\r", a1, b1, c1);
+void canLoop(void){
+    //printf("%d\n\r", canCmd);
+    readCAN();
+    //sendCMD(TX_ID, canCmd);
+    
     //sendCMD(TX_ID+b_ID, b1);
     //sendCMD(TX_ID+c_ID, c1);
     }
@@ -82,7 +90,7 @@ PositionSensorEncoder encoder(4096, 0, 21);
 
 
 CurrentRegulator foc(&inverter, &spi, &encoder, 0.000033, .005, .55);    
-TorqueController torqueController(.031f, &foc);
+TorqueController torqueController(.082f, &foc);
 ImpedanceController impedanceController(&torqueController, &spi, &encoder);
 
 Ticker  testing;
@@ -104,14 +112,13 @@ void Loop(void){
     count++;
     //impedanceController.SetImpedance(cmd_float[1], cmd_float[2], cmd_float[0]);
     //impedanceController.SetImpedance(.1, -0.01, 0);
-    
-    torqueController.SetTorque(.1);
-    //foc.Commutate();
-    //voltage_foc();
-    if(count>2000){
+    float torqueCmd = ((float)(canCmd-1000))/100;
+    torqueController.SetTorque(torqueCmd);
+    if(count>100){
+        canLoop();
         //float e = spi.GetElecPosition();
         //float v = encoder.GetMechVelocity();
-        //printf("%f\n\r", v);
+        //printf("%f\n\r", torqueCmd);
         //printf("IA: %f   IB: %f  IC: %f\n\r", inverter.I_A, inverter.I_B, inverter.I_C);
         count = 0;
         }
@@ -155,9 +162,16 @@ int main() {
     inverter.EnableInverter();
     foc.Reset();
     testing.attach(&Loop, .000025);
+    //canTick.attach(&canLoop, .01);
     //testing.attach(&PrintStuff, .05);
     NVIC_SetPriority(TIM5_IRQn, 2);
+    
+    can.frequency(1000000);                     // set bit rate to 1Mbps
+    can.attach(&onMsgReceived);                 // attach 'CAN receive-complete' interrupt handler
+    can.filter(0x020 << 25, 0xF0000004, CANAny, 0);
+    
     pc.baud(921600);
+    wait(.1);
     pc.printf("HobbyKing Cheeta v1.1\n\r");
     wait(.1);
     while(1) {

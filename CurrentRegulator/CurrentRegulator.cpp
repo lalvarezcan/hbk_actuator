@@ -132,6 +132,12 @@ void CurrentRegulator::Update(){
         //V_Q = V_Q - w_elec*I_D;
         V_D = D_Integral + _Kp*D_Error;     
         //V_D = V_D + w_elec*I_Q;   //decoupling needs moar testing
+        float mag2 = (V_Q*V_Q + V_D*V_D);
+        if(mag2>1){
+            V_Q = V_Q/mag2;
+            V_D = V_D/mag2;
+            }
+        
     }
         
 void CurrentRegulator::SetVoltage(){
