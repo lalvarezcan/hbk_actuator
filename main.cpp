@@ -81,7 +81,7 @@ int buff[8];
 Serial pc(PA_2, PA_3);
 
 Inverter inverter(PA_10, PA_9, PA_8, PA_11, 0.02014160156, 0.00005);  //hall motor
-PositionSensorAM5147 spi(16384, 1.65f, 21);   ///1  I really need an eeprom or something to store this....
+PositionSensorAM5147 spi(16384, 4.7, 21);   ///1  I really need an eeprom or something to store this....
 //PositionSensorSPI spi(2048, 1.34f, 7); ///2
 
 
@@ -133,9 +133,10 @@ void PrintStuff(void){
     int position = spi.GetRawPosition();
     //float m = spi.GetMechPosition();
     float e = spi.GetElecPosition();
-    foc.Commutate();
-    float q = foc.GetQ();
-    printf("position: %d   angle: %f    q current: %f\n\r", position, e, q);
+    printf("%f\n\r", e);
+    //foc.Commutate();
+    //float q = foc.GetQ();
+    //printf("position: %d   angle: %f    q current: %f\n\r", position, e, q);
     //inverter.getCurrent()
     //printf("%f   %f   %f   %f \n\r", m, cmd_float[0], cmd_float[1], cmd_float[2]);
     //printf("%d   %d   %d\n\r", raw[0], raw[1], raw[2]);
@@ -158,7 +159,7 @@ int main() {
     inverter.DisableInverter();
     spi.ZeroPosition();
     wait(.1);
-    inverter.SetDTC(0.03, 0.0, 0.0);
+    inverter.SetDTC(0.0, 0.0, 0.0);
     inverter.EnableInverter();
     foc.Reset();
     testing.attach(&Loop, .000025);
