@@ -58,4 +58,19 @@ private:
     int readAngleCmd;
 
 };
+
+class PositionSensorSineGen: public PositionSensor{
+public:
+    PositionSensorSineGen(int CPR, float offset, int ppairs);
+    virtual float GetMechPosition();
+    virtual float GetElecPosition();
+    virtual float GetMechVelocity();
+    virtual int GetRawPosition();
+    virtual void ZeroPosition();
+private:
+    float _offset, MechPosition, MechOffset;
+    int _CPR, rotations, old_counts, _ppairs;
+    int readAngleCmd;
+
+};
 #endif

@@ -4,8 +4,8 @@
 const float Multiplier = 81.4873308631f;
 
 float FastMath::FastSin(float theta){
-    if (theta < 0.0f) theta += 6.28318530718f;
-    if (theta >= 6.28318530718f) theta -= 6.28318530718f;    
+    while (theta < 0.0f) theta += 6.28318530718f;
+    while (theta >= 6.28318530718f) theta -= 6.28318530718f;    
     return SinTable[(int) (Multiplier*theta)] ;
     }
     

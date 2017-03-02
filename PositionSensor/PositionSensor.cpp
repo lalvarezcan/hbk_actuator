@@ -66,7 +66,7 @@ PositionSensorAM5147::PositionSensorAM5147(int CPR, float offset, int ppairs){
     rotations = 0;
     spi = new SPI(PC_12, PC_11, PC_10);
     spi->format(16, 1);
-    spi->frequency(10000000);
+    spi->frequency(5000000);
     cs = new DigitalOut(PA_15);
     cs->write(1);
     readAngleCmd = 0xffff;
@@ -117,6 +117,8 @@ void PositionSensorAM5147::ZeroPosition(){
     rotations = 0;
     MechOffset = GetMechPosition();
     }
+    
+    
     
 PositionSensorEncoder::PositionSensorEncoder(int CPR, float offset, int ppairs) {
     _ppairs = ppairs;
