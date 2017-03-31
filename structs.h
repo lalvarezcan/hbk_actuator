@@ -9,6 +9,7 @@
 typedef struct{
     DigitalOut *enable;
     FastPWM *pwm_u, *pwm_v, *pwm_w;
+    int phasing;
     } GPIOStruct;
     
 typedef struct{
@@ -28,7 +29,19 @@ typedef struct{
     float d_int, q_int;
     int adc1_offset, adc2_offset;
     float i_d_ref, i_q_ref;
+    int loop_count;
+    int mode;
     } ControllerStruct;
 
-
+typedef struct{
+    float vel_1;
+    float vel_1_old;
+    float vel_1_est;
+    float vel_2;
+    float vel_2_old;
+    float vel_2_est;
+    float ts;
+    float est;
+    } VelocityEstimatorStruct;
+    
 #endif

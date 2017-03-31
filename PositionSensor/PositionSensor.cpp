@@ -1,116 +1,86 @@
 
 #include "mbed.h"
 #include "PositionSensor.h"
+//#include "offset_lut.h"
 //#include <math.h>
 
-PositionSensorMA700::PositionSensorMA700(int CPR, float offset, int ppairs){
-    //_CPR = CPR;
-    _CPR = CPR;
-    _ppairs = ppairs;
-    _offset = offset;
-    rotations = 0;
-    spi = new SPI(PC_12, PC_11, PC_10);
-    spi->format(16, 0);
-    cs = new DigitalOut(PA_15);
-    cs->write(1);
-    MechOffset = 0;
-    }
-
-int PositionSensorMA700::GetRawPosition(){
-        cs->write(0);
-    int response = spi->write(0)>>4;
-    cs->write(1);
-    return response;
-    }
-    
-
-float PositionSensorMA700::GetMechPosition(){
-    cs->write(0);
-    int response = spi->write(0)>>4;
-    cs->write(1);
-    if(response - old_counts > _CPR/4){
-        rotations -= 1;
-        }
-    else if (response - old_counts < -_CPR/4){
-        rotations += 1;
-        }
-    old_counts = response;
-    MechPosition = (6.28318530718f * ((float) response+(_CPR*rotations)))/ (float)_CPR;
-    //return MechPosition - MechOffset;
-    return MechPosition;
-    }
-
-float PositionSensorMA700::GetElecPosition(){
-    cs->write(0);
-    int response = spi->write(0)>>4;
-    cs->write(1);
-    float elec = ((6.28318530718f/(float)_CPR) * (float) ((_ppairs*response)%_CPR)) - _offset;
-    if(elec < 0) elec += 6.28318530718f;
-    return elec;
-    }
-
-float PositionSensorMA700::GetMechVelocity(){
-    return 0;
-    }
-
-void PositionSensorMA700::ZeroPosition(){
-    rotations = 0;
-    MechOffset = GetMechPosition();
-    }
-    
 PositionSensorAM5147::PositionSensorAM5147(int CPR, float offset, int ppairs){
     //_CPR = CPR;
     _CPR = CPR;
     _ppairs = ppairs;
-    _offset = offset;
+    ElecOffset = offset;
     rotations = 0;
     spi = new SPI(PC_12, PC_11, PC_10);
     spi->format(16, 1);
     spi->frequency(5000000);
     cs = new DigitalOut(PA_15);
     cs->write(1);
-    readAngleCmd = 0xffff;
+    readAngleCmd = 0xffff;   
     MechOffset = 0;
+    modPosition = 0;
+    oldModPosition = 0;
+    oldVel = 0;
+    raw = 0;
+    }
+    
+void PositionSensorAM5147::Sample(){
+    cs->write(0);
+    raw = spi->write(readAngleCmd);
+    raw &= 0x3FFF;    //Extract last 14 bits
+    cs->write(1);
+    int angle = raw + offset_lut[raw>>7];
+    if(angle - old_counts > _CPR/2){
+        rotations -= 1;
+        }
+    else if (angle - old_counts < -_CPR/2){
+        rotations += 1;
+        }
+    
+    old_counts = angle;
+    oldModPosition = modPosition;
+    modPosition = ((6.28318530718f * ((float) angle))/ (float)_CPR);
+    position = (6.28318530718f * ((float) angle+(_CPR*rotations)))/ (float)_CPR;
+    MechPosition = position - MechOffset;
+    float elec = ((6.28318530718f/(float)_CPR) * (float) ((_ppairs*angle)%_CPR)) - ElecOffset;
+    if(elec < 0) elec += 6.28318530718f;
+    ElecPosition = elec;
+    
+    float vel;
+    if(modPosition<.1f && oldModPosition>6.1f){
+        vel = (modPosition - oldModPosition + 6.28318530718f)*40000.0f;
+        }
+    else if(modPosition>6.1f && oldModPosition<0.1f){
+        vel = (modPosition - oldModPosition - 6.28318530718f)*40000.0f;
+        }
+    else{
+        vel = (modPosition-oldModPosition)*40000.0f;
+    }    
+    
+    int n = 16;
+    float sum = vel;
+    for (int i = 1; i < (n); i++){
+        velVec[n - i] = velVec[n-i-1];
+        sum += velVec[n-i];
+        }
+    velVec[0] = vel;
+    MechVelocity =  sum/(float)n;
+    ElecVelocity = MechVelocity*_ppairs;
     }
 
 int PositionSensorAM5147::GetRawPosition(){
-    cs->write(0);
-    int angle = spi->write(0xffff);
-    angle &= 0x3FFF;    //Extract last 14 bits
-    cs->write(1);    
-    return angle;
+    return raw;
     }
     
-
 float PositionSensorAM5147::GetMechPosition(){
-    cs->write(0);
-    int angle = spi->write(readAngleCmd);
-    angle &= 0x3FFF;    //Extract last 14 bits
-    cs->write(1);
-    if(angle - old_counts > _CPR/4){
-        rotations -= 1;
-        }
-    else if (angle - old_counts < -_CPR/4){
-        rotations += 1;
-        }
-    old_counts = angle;
-    MechPosition = (6.28318530718f * ((float) angle+(_CPR*rotations)))/ (float)_CPR;
-    //return MechPosition - MechOffset;
     return MechPosition;
     }
 
 float PositionSensorAM5147::GetElecPosition(){
-    cs->write(0);
-    int angle = spi->write(readAngleCmd);
-    angle &= 0x3FFF;    //Extract last 14 bits
-    cs->write(1);
-    float elec = ((6.28318530718f/(float)_CPR) * (float) ((_ppairs*angle)%_CPR)) - _offset;
-    if(elec < 0) elec += 6.28318530718f;
-    return elec;
+    return ElecPosition;
     }
 
 float PositionSensorAM5147::GetMechVelocity(){
-    return 0;
+    return MechVelocity;
     }
 
 void PositionSensorAM5147::ZeroPosition(){
@@ -118,13 +88,28 @@ void PositionSensorAM5147::ZeroPosition(){
     MechOffset = GetMechPosition();
     }
     
+void PositionSensorAM5147::SetElecOffset(float offset){
+    ElecOffset = offset;
+    }
+
+int PositionSensorAM5147::GetCPR(){
+    return _CPR;
+    }
+
+
+void PositionSensorAM5147::WriteLUT(int new_lut[128]){
+    memcpy(offset_lut, new_lut, sizeof(offset_lut));
+    }
     
-    
+
 PositionSensorEncoder::PositionSensorEncoder(int CPR, float offset, int ppairs) {
     _ppairs = ppairs;
     _CPR = CPR;
     _offset = offset;
     MechPosition = 0;
+    out_old = 0;
+    oldVel = 0;
+    raw = 0;
     
     // Enable clock for GPIOA
     __GPIOA_CLK_ENABLE(); //equivalent from hal_rcc.h
@@ -140,25 +125,25 @@ PositionSensorEncoder::PositionSensorEncoder(int CPR, float offset, int ppairs) 
     // Enable clock for TIM3
     __TIM3_CLK_ENABLE();
  
-    TIM3->CR1   = 0x0001;     // CEN(Counter ENable)='1'     < TIM control register 1
-    TIM3->SMCR  = TIM_ENCODERMODE_TI12;     // SMS='011' (Encoder mode 3)  < TIM slave mode control register
-    TIM3->CCMR1 = 0xf1f1;     // CC1S='01' CC2S='01'         < TIM capture/compare mode register 1, maximum digital filtering
-    TIM3->CCMR2 = 0x0000;     //                             < TIM capture/compare mode register 2
-    TIM3->CCER  = 0x0011;     // CC1P CC2P                   < TIM capture/compare enable register
-    TIM3->PSC   = 0x0000;     // Prescaler = (0+1)           < TIM prescaler
-    TIM3->ARR   = CPR-1; // reload at 0xfffffff         < TIM auto-reload register
+    TIM3->CR1   = 0x0001;                                                   // CEN(Counter ENable)='1'     < TIM control register 1
+    TIM3->SMCR  = TIM_ENCODERMODE_TI12;                                     // SMS='011' (Encoder mode 3)  < TIM slave mode control register
+    TIM3->CCMR1 = 0x1111;                                                   // CC1S='01' CC2S='01'         < TIM capture/compare mode register 1, maximum digital filtering
+    TIM3->CCMR2 = 0x0000;                                                   //                             < TIM capture/compare mode register 2
+    TIM3->CCER  = 0x0011;                                                   // CC1P CC2P                   < TIM capture/compare enable register
+    TIM3->PSC   = 0x0000;                                                   // Prescaler = (0+1)           < TIM prescaler
+    TIM3->ARR   = CPR;                                                      // IM auto-reload register
   
     TIM3->CNT = 0x000;  //reset the counter before we use it  
     
     // Extra Timer for velocity measurement
     
     __TIM2_CLK_ENABLE();
-    TIM3->CR2 = 0x030;  //MMS = 101
+    TIM3->CR2 = 0x030;                                                      //MMS = 101
     
     TIM2->PSC = 0x03;
     //TIM2->CR2 |= TIM_CR2_TI1S;
-    TIM2->SMCR = 0x24; //TS = 010 for ITR2, SMS = 100 (reset counter at edge)
-    TIM2->CCMR1 = 0x3;// CC1S = 11, IC1 mapped on TRC
+    TIM2->SMCR = 0x24;                                                      //TS = 010 for ITR2, SMS = 100 (reset counter at edge)
+    TIM2->CCMR1 = 0x3;                                                      // CC1S = 11, IC1 mapped on TRC
     
     //TIM2->CR2 |= TIM_CR2_TI1S;
     TIM2->CCER |= TIM_CCER_CC1P;
@@ -166,9 +151,9 @@ PositionSensorEncoder::PositionSensorEncoder(int CPR, float offset, int ppairs) 
     TIM2->CCER |= TIM_CCER_CC1E;
     
     
-    TIM2->CR1 = 0x01;       //CEN
+    TIM2->CR1 = 0x01;                                                       //CEN,  enable timer
     
-    TIM3->CR1   = 0x01;     // CEN
+    TIM3->CR1   = 0x01;                                                     // CEN
     ZPulse = new InterruptIn(PC_4);
     ZSense = new DigitalIn(PC_4);
     //ZPulse = new InterruptIn(PB_0);
@@ -182,17 +167,20 @@ PositionSensorEncoder::PositionSensorEncoder(int CPR, float offset, int ppairs) 
     
     //ZTest = new DigitalOut(PC_2);
     //ZTest->write(1);
+    }
     
+void PositionSensorEncoder::Sample(){
     
-}
+    }
+
  
-float PositionSensorEncoder::GetMechPosition() {        //returns rotor angle in radians.
+float PositionSensorEncoder::GetMechPosition() {                            //returns rotor angle in radians.
     int raw = TIM3->CNT;
     float unsigned_mech = (6.28318530718f/(float)_CPR) * (float) ((raw)%_CPR);
     return (float) unsigned_mech;// + 6.28318530718f* (float) rotations;
 }
 
-float PositionSensorEncoder::GetElecPosition() {        //returns rotor electrical angle in radians.
+float PositionSensorEncoder::GetElecPosition() {                            //returns rotor electrical angle in radians.
     int raw = TIM3->CNT;
     float elec = ((6.28318530718f/(float)_CPR) * (float) ((_ppairs*raw)%_CPR)) - _offset;
     if(elec < 0) elec += 6.28318530718f;
@@ -202,22 +190,30 @@ float PositionSensorEncoder::GetElecPosition() {        //returns rotor electric
 
     
 float PositionSensorEncoder::GetMechVelocity(){
+
     float out = 0;
     float rawPeriod = TIM2->CCR1; //Clock Ticks
-    
+    int currentTime = TIM2->CNT;
+    if(currentTime > 2000000){rawPeriod = currentTime;}
     float  dir = -2.0f*(float)(((TIM3->CR1)>>4)&1)+1.0f;    // +/- 1
-    float meas = dir*90000000.0f*(6.28318530718f/(float)_CPR)/rawPeriod; 
+    float meas = dir*180000000.0f*(6.28318530718f/(float)_CPR)/rawPeriod; 
+    if(isinf(meas)){ meas = 1;}
     out = meas;
-    if(meas == vel_old){
-        out = .99f*out_old;
-        }
-    else{
-        out = meas;
-        }
+    //if(meas == oldVel){
+     //   out = .9f*out_old;
+     //   }
     
-    vel_old = meas;
+ 
+    oldVel = meas;
     out_old = out;
-    return out;
+    int n = 16;
+    float sum = out;
+    for (int i = 1; i < (n); i++){
+        velVec[n - i] = velVec[n-i-1];
+        sum += velVec[n-i];
+        }
+    velVec[0] = out;
+    return sum/(float)n;
     }
     
 float PositionSensorEncoder::GetElecVelocity(){
@@ -236,6 +232,10 @@ void PositionSensorEncoder::ZeroEncoderCount(void){
         }
         }
     }
+
+void PositionSensorEncoder::ZeroPosition(void){
+    
+    }
     
 void PositionSensorEncoder::ZeroEncoderCountDown(void){
     if (ZSense->read() == 0){
@@ -252,4 +252,20 @@ void PositionSensorEncoder::ZeroEncoderCountDown(void){
 
         }
         }
+    }
+void PositionSensorEncoder::SetElecOffset(float offset){
+    
+    }
+    
+int PositionSensorEncoder::GetRawPosition(void){
+    return 0;
+    }
+    
+int PositionSensorEncoder::GetCPR(){
+    return _CPR;
+    }
+    
+
+void PositionSensorEncoder::WriteLUT(int new_lut[128]){
+    memcpy(offset_lut, new_lut, sizeof(offset_lut));
     }
