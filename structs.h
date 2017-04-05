@@ -31,6 +31,7 @@ typedef struct{
     float i_d_ref, i_q_ref;
     int loop_count;
     int mode;
+    float cogging[128];
     } ControllerStruct;
 
 typedef struct{

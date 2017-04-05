@@ -43,6 +43,7 @@ void PositionSensorAM5147::Sample(){
     MechPosition = position - MechOffset;
     float elec = ((6.28318530718f/(float)_CPR) * (float) ((_ppairs*angle)%_CPR)) - ElecOffset;
     if(elec < 0) elec += 6.28318530718f;
+    else if(elec > 6.28318530718f) elec -= 6.28318530718f ; 
     ElecPosition = elec;
     
     float vel;

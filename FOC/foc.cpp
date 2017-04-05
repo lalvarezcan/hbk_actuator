@@ -26,9 +26,9 @@ void svm(float v_bus, float u, float v, float w, float *dtc_u, float *dtc_v, flo
     ///u,v,w amplitude = v_bus for full modulation depth///
     
     float v_offset = (fminf3(u, v, w) + fmaxf3(u, v, w))/2.0f;
-    *dtc_u = fminf(fmaxf(((u - v_offset)*0.5f/v_bus + 0.5f), DTC_MIN), DTC_MAX);
-    *dtc_v = fminf(fmaxf(((v - v_offset)*0.5f/v_bus + 0.5f), DTC_MIN), DTC_MAX);
-    *dtc_w = fminf(fmaxf(((w - v_offset)*0.5f/v_bus + 0.5f), DTC_MIN), DTC_MAX);
+    *dtc_u = fminf(fmaxf(((u - v_offset)*0.5f/v_bus + ((DTC_MAX-DTC_MIN)/2)), DTC_MIN), DTC_MAX);
+    *dtc_v = fminf(fmaxf(((v - v_offset)*0.5f/v_bus + ((DTC_MAX-DTC_MIN)/2)), DTC_MIN), DTC_MAX);
+    *dtc_w = fminf(fmaxf(((w - v_offset)*0.5f/v_bus + ((DTC_MAX-DTC_MIN)/2)), DTC_MIN), DTC_MAX);
     
     }
 
@@ -68,9 +68,13 @@ void commutate(ControllerStruct *controller, GPIOStruct *gpio, float theta){
        
        dq0(controller->theta_elec, controller->i_a, controller->i_b, controller->i_c, &controller->i_d, &controller->i_q);    //dq0 transform on currents
        
+       ///Cogging Compensation Lookup///
+       //int ind = theta * (128.0f/(2.0f*PI));
+       //float cogging_current = controller->cogging[ind];
+       //float cogging_current = 1.0f*cos(6*theta);
        ///Controller///
        float i_d_error = controller->i_d_ref - controller->i_d;
-       float i_q_error = controller->i_q_ref - controller->i_q;
+       float i_q_error = controller->i_q_ref - controller->i_q;// + cogging_current;
        float v_d_ff = 2.0f*(2*controller->i_d_ref*R_PHASE);   //feed-forward voltage
        float v_q_ff = 2.0f*(2*controller->i_q_ref*R_PHASE + controller->dtheta_elec*WB*0.8165f);
        controller->d_int += i_d_error;   
@@ -118,11 +122,11 @@ void commutate(ControllerStruct *controller, GPIOStruct *gpio, float theta){
        controller->theta_elec = theta;   //For some reason putting this at the front breaks thins
        
 
-       if(controller->loop_count >1000){
+       if(controller->loop_count >400){
            //controller->i_q_ref = -controller->i_q_ref;
            controller->loop_count  = 0;
            
-           //printf("%f\n\r", controller->dtheta_elec);
+           //printf("%d   %f\n\r", ind, cogging_current);
            //printf("%f\n\r", controller->theta_elec);
            //pc.printf("%f    %f    %f\n\r", controller->i_a, controller->i_b, controller->i_c);
            //pc.printf("%f    %f\n\r", controller->i_d, controller->i_q);
