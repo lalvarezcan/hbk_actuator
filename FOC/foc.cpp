@@ -1,4 +1,4 @@
-
+#include "user_config.h"
 #include "foc.h"
 
 //#include "FastMath.h"
@@ -55,7 +55,7 @@ void reset_foc(ControllerStruct *controller){
 void commutate(ControllerStruct *controller, GPIOStruct *gpio, float theta){
        
        controller->loop_count ++;
-       if(gpio->phasing){
+       if(PHASE_ORDER){
            controller->i_b = I_SCALE*(float)(controller->adc2_raw - controller->adc2_offset);    //Calculate phase currents from ADC readings
            controller->i_c = I_SCALE*(float)(controller->adc1_raw - controller->adc1_offset);
            }
@@ -103,7 +103,7 @@ void commutate(ControllerStruct *controller, GPIOStruct *gpio, float theta){
        //gpio->pwm_v->write(1.0f-controller->dtc_v);
        //gpio->pwm_w->write(1.0f-controller->dtc_w);  
        
-       if(gpio->phasing){
+       if(PHASE_ORDER){
             TIM1->CCR3 = 0x708*(1.0f-controller->dtc_u);
             TIM1->CCR2 = 0x708*(1.0f-controller->dtc_v);
             TIM1->CCR1 = 0x708*(1.0f-controller->dtc_w);

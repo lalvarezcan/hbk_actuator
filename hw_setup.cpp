@@ -17,7 +17,6 @@ void Init_PWM(GPIOStruct *gpio){
     gpio->pwm_v = new FastPWM(PIN_V);
     gpio->pwm_w = new FastPWM(PIN_W);
     
-    gpio->phasing = 1;
     
     
      //ISR Setup     

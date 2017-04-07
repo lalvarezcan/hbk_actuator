@@ -35,9 +35,6 @@ int __int_reg[256];
 #include "FlashWriter.h"
 #include "user_config.h"
 #include "PreferenceWriter.h"
-//#include "state_machine.h"
-
-
 
 PreferenceWriter prefs(6);
 
@@ -45,7 +42,6 @@ GPIOStruct gpio;
 ControllerStruct controller;
 COMStruct com;
 VelocityEstimatorStruct velocity;
-
 
 
 CANnucleo::CAN          can(PB_8, PB_9);                                        // CAN Rx pin name, CAN Tx pin name
@@ -118,9 +114,18 @@ void enter_menu_state(void){
     printf(" esc - Exit to Menu\n\r");
     state_change = 0;
     }
+
+void enter_setup_state(void){
+    printf("\n\r\n\r Configuration Options \n\r\n\n");
+    printf(" %-7s %-25s %-5s %-5s %-5s\n\r\n\r", "prefix", "parameter", "min", "max", "current value");
+    printf(" %-7s %-25s %-5s %-5s %.1f\n\r", "b", "Current Bandwidth (Hz)", "100", "2000", I_BW);
+    printf(" %-7s %-25s %-5s %-5s %-5i\n\r", "i", "CAN ID", "0", "127", CAN_ID);
+    printf(" %-7s %-25s %-5s %-5s %.1f\n\r", "l", "Torque Limit (N-m)", "0.0", "18.0", TORQUE_LIMIT);
+    printf("\n\r To change a value, type 'prefix''value''ENTER'\n\r i.e. 'b1000''ENTER'\n\r\n\r");
+    state_change = 0;
+    }
     
 void enter_torque_mode(void){
-    controller.mode = 2;
     controller.i_d_ref = 0;
     controller.i_q_ref = 0;
     reset_foc(&controller);                                                     //resets integrators, and other control loop parameters
@@ -194,8 +199,7 @@ extern "C" void TIM1_UP_TIM10_IRQHandler(void) {
                 break;
             case SETUP_MODE:
                 if(state_change){
-                    printf("\n\r Configuration Menu \n\r\n\n");
-                    state_change = 0;
+                    enter_setup_state();
                 }
                 break;
             case ENCODER_MODE:
@@ -210,15 +214,19 @@ extern "C" void TIM1_UP_TIM10_IRQHandler(void) {
 }
 
 /// Manage state machine with commands from serial terminal or configurator gui ///
+char cmd_val[8] = {0};
+char cmd_id = 0;
+
+char char_count = 0;
 void serial_interrupt(void){
     while(pc.readable()){
         char c = pc.getc();
-        if(c == 27){
-            state = REST_MODE;
-            state_change = 1;
-            }
-        else if(state == REST_MODE){
+        if(state == REST_MODE){
             switch (c){
+                case 27:
+                    state = REST_MODE;
+                    state_change = 1;
+                    break;
                 case 'c':
                     state = CALIBRATION_MODE;
                     state_change = 1;
@@ -235,10 +243,61 @@ void serial_interrupt(void){
                     state = SETUP_MODE;
                     state_change = 1;
                     break;
-                
+                    }
+                }
+        else if(state == SETUP_MODE){
+            if(c == 27){
+                state = REST_MODE;
+                state_change = 1;
+                char_count = 0;
+                cmd_id = 0;
+                for(int i = 0; i<8; i++){cmd_val[i] = 0;}
+                }
+            else if(c == 13){
+                switch (cmd_id){
+                    case 'b':
+                        I_BW = fmaxf(fminf(atof(cmd_val), 2000.0f), 100.0f);
+                        break;
+                    case 'i':
+                        CAN_ID = atoi(cmd_val);
+                        break;
+                    case 'l':
+                        TORQUE_LIMIT = fmaxf(fminf(atof(cmd_val), 18.0f), 0.0f);
+                        break;
+                    default:
+                        printf("\n\r '%c' Not a valid command prefix\n\r\n\r", cmd_id);
+                        break;
+                    }
+                    
+                if (!prefs.ready()) prefs.open();
+                prefs.flush();                                                  // Write new prefs to flash
+                prefs.close();    
+                prefs.load();                                              
+                state_change = 1;
+                char_count = 0;
+                cmd_id = 0;
+                for(int i = 0; i<8; i++){cmd_val[i] = 0;}
+                }
+            else{
+                if(char_count == 0){cmd_id = c;}
+                else{
+                    cmd_val[char_count-1] = c;
+                    
+                }
+                pc.putc(c);
+                char_count++;
                 }
             }
-    }
+        else if (state == ENCODER_MODE){
+            switch (c){
+                case 27:
+                    state = REST_MODE;
+                    state_change = 1;
+                    break;
+                    }
+            }
+            
+        }
     }
        
 int main() {
@@ -283,7 +342,7 @@ int main() {
     printf("\n\r Debug Info:\n\r");
     printf(" ADC1 Offset: %d    ADC2 Offset: %d\n\r", controller.adc1_offset, controller.adc2_offset);
     printf(" Position Sensor Electrical Offset:   %.4f\n\r", E_OFFSET);
-    printf(" CAN ID:  %d\n\r", BOARDNUM);
+    printf(" CAN ID:  %d\n\r", CAN_ID);
         
     pc.attach(&serial_interrupt);                                               // attach serial interrupt
     

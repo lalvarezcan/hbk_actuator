@@ -9,7 +9,6 @@
 typedef struct{
     DigitalOut *enable;
     FastPWM *pwm_u, *pwm_v, *pwm_w;
-    int phasing;
     } GPIOStruct;
     
 typedef struct{

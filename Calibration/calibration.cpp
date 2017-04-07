@@ -62,7 +62,6 @@ void order_phases(PositionSensor *ps, GPIOStruct *gpio, ControllerStruct *contro
     printf("Direction:  %d\n\r", direction);
     if(direction){printf("Phasing correct\n\r");}
     else if(!direction){printf("Phasing incorrect.  Swapping phases V and W\n\r");}
-    gpio->phasing = direction;
     PHASE_ORDER = direction;
     }
     
@@ -92,7 +91,7 @@ void calibrate(PositionSensor *ps, GPIOStruct *gpio, ControllerStruct *controlle
     svm(1.0, v_u, v_v, v_w, &dtc_u, &dtc_v, &dtc_w);                        // space vector modulation
     for(int i = 0; i<40000; i++){
         TIM1->CCR3 = 0x708*(1.0f-dtc_u);                                    // Set duty cycles
-        if(gpio->phasing){                                   
+        if(PHASE_ORDER){                                   
             TIM1->CCR2 = 0x708*(1.0f-dtc_v);
             TIM1->CCR1 = 0x708*(1.0f-dtc_w);
             }
@@ -114,7 +113,7 @@ void calibrate(PositionSensor *ps, GPIOStruct *gpio, ControllerStruct *controlle
        abc(theta_ref, v_d, v_q, &v_u, &v_v, &v_w);                          // inverse dq0 transform on voltages
        svm(1.0, v_u, v_v, v_w, &dtc_u, &dtc_v, &dtc_w);                     // space vector modulation
         TIM1->CCR3 = 0x708*(1.0f-dtc_u);
-        if(gpio->phasing){
+        if(PHASE_ORDER){
             TIM1->CCR2 = 0x708*(1.0f-dtc_v);
             TIM1->CCR1 = 0x708*(1.0f-dtc_w);
             }
@@ -139,7 +138,7 @@ void calibrate(PositionSensor *ps, GPIOStruct *gpio, ControllerStruct *controlle
        abc(theta_ref, v_d, v_q, &v_u, &v_v, &v_w);                          // inverse dq0 transform on voltages
        svm(1.0, v_u, v_v, v_w, &dtc_u, &dtc_v, &dtc_w);                     // space vector modulation
         TIM1->CCR3 = 0x708*(1.0f-dtc_u);
-        if(gpio->phasing){
+        if(PHASE_ORDER){
             TIM1->CCR2 = 0x708*(1.0f-dtc_v);
             TIM1->CCR1 = 0x708*(1.0f-dtc_w);
             }

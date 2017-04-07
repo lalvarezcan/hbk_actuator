@@ -34,6 +34,7 @@ void PreferenceWriter::flush() {
     for (; offs < 320; offs++) {
         writer->write(offs, __float_reg[offs - 256]);
     }
+    __ready = false;
 }
 
 void PreferenceWriter::load() {
@@ -47,5 +48,6 @@ void PreferenceWriter::load() {
 }
 
 void PreferenceWriter::close() {
+    __ready = false;
     writer->close();
 }
