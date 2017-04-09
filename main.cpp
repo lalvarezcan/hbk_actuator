@@ -113,6 +113,7 @@ void enter_menu_state(void){
     printf(" e - Display Encoder\n\r");
     printf(" esc - Exit to Menu\n\r");
     state_change = 0;
+    gpio.enable->write(0);
     }
 
 void enter_setup_state(void){
@@ -127,20 +128,21 @@ void enter_setup_state(void){
     
 void enter_torque_mode(void){
     controller.i_d_ref = 0;
-    controller.i_q_ref = 0;
-    reset_foc(&controller);                                                     //resets integrators, and other control loop parameters
-    gpio.enable->write(1);
-    GPIOC->ODR ^= (1 << 5);                                                     //turn on status LED
+    controller.i_q_ref = 1;                                                     // Current Setpoints
+    reset_foc(&controller);                                                     // Tesets integrators, and other control loop parameters
+    gpio.enable->write(1);                                                      // Enable gate drive
+    GPIOC->ODR ^= (1 << 5);                                                     // Turn on status LED
+    state_change = 0;
     }
     
 void calibrate(void){
-    gpio.enable->write(1);
-    GPIOC->ODR ^= (1 << 5);     
-    order_phases(&spi, &gpio, &controller, &prefs);
-    calibrate(&spi, &gpio, &controller, &prefs);
-    GPIOC->ODR ^= (1 << 5);
+    gpio.enable->write(1);                                                      // Enable gate drive
+    GPIOC->ODR ^= (1 << 5);                                                     // Turn on status LED
+    order_phases(&spi, &gpio, &controller, &prefs);                             // Check phase ordering
+    calibrate(&spi, &gpio, &controller, &prefs);                                // Perform calibration procedure
+    GPIOC->ODR ^= (1 << 5);                                                     // Turn off status LED
     wait(.2);
-    gpio.enable->write(0);
+    gpio.enable->write(0);                                                      // Turn off gate drive
     printf("\n\r Calibration complete.  Press 'esc' to return to menu\n\r");
      state_change = 0;
      
@@ -160,10 +162,10 @@ extern "C" void TIM1_UP_TIM10_IRQHandler(void) {
         //toggle = 1;
 
         ///Sample current always ///
-        ADC1->CR2  |= 0x40000000;                                               //Begin sample and conversion
+        ADC1->CR2  |= 0x40000000;                                               // Begin sample and conversion
         //volatile int delay;   
         //for (delay = 0; delay < 55; delay++);
-        controller.adc2_raw = ADC2->DR;
+        controller.adc2_raw = ADC2->DR;                                         // Read ADC1 and ADC2 Data Registers
         controller.adc1_raw = ADC1->DR;
         ///
         
@@ -183,14 +185,17 @@ extern "C" void TIM1_UP_TIM10_IRQHandler(void) {
                 break;
              
             case TORQUE_MODE:                                                   // Run torque control
+                if(state_change){
+                    enter_torque_mode();
+                    }
                 count++;
                 controller.theta_elec = spi.GetElecPosition();                  
                 commutate(&controller, &gpio, controller.theta_elec);           // Run current loop
                 spi.Sample();                                                   // Sample position sensor
                 if(count > 100){
                      count = 0;
-                     readCAN();
-                     controller.i_q_ref = ((float)(canCmd-1000))/100;
+                     //readCAN();
+                     //controller.i_q_ref = ((float)(canCmd-1000))/100;
                     //pc.printf("%f\n\r ", controller.theta_elec);
                      }
                 break;
@@ -213,20 +218,25 @@ extern "C" void TIM1_UP_TIM10_IRQHandler(void) {
   TIM1->SR = 0x0;                                                               // reset the status register
 }
 
-/// Manage state machine with commands from serial terminal or configurator gui ///
+
 char cmd_val[8] = {0};
 char cmd_id = 0;
-
 char char_count = 0;
+
+/// Manage state machine with commands from serial terminal or configurator gui ///
+/// Called when data received over serial ///
 void serial_interrupt(void){
     while(pc.readable()){
         char c = pc.getc();
+        if(c == 27){
+                state = REST_MODE;
+                state_change = 1;
+                char_count = 0;
+                cmd_id = 0;
+                for(int i = 0; i<8; i++){cmd_val[i] = 0;}
+                }
         if(state == REST_MODE){
             switch (c){
-                case 27:
-                    state = REST_MODE;
-                    state_change = 1;
-                    break;
                 case 'c':
                     state = CALIBRATION_MODE;
                     state_change = 1;
@@ -246,14 +256,7 @@ void serial_interrupt(void){
                     }
                 }
         else if(state == SETUP_MODE){
-            if(c == 27){
-                state = REST_MODE;
-                state_change = 1;
-                char_count = 0;
-                cmd_id = 0;
-                for(int i = 0; i<8; i++){cmd_val[i] = 0;}
-                }
-            else if(c == 13){
+            if(c == 13){
                 switch (cmd_id){
                     case 'b':
                         I_BW = fmaxf(fminf(atof(cmd_val), 2000.0f), 100.0f);
@@ -302,11 +305,8 @@ void serial_interrupt(void){
        
 int main() {
     
-
-
     controller.v_bus = V_BUS;
     controller.mode = 0;
-    //spi.ZeroPosition(); 
     Init_All_HW(&gpio);                                                         // Setup PWM, ADC, GPIO
 
     wait(.1);
@@ -329,11 +329,11 @@ int main() {
     can.filter(0x020 << 25, 0xF0000004, CANAny, 0);
     
     
-    prefs.load();
-    spi.SetElecOffset(E_OFFSET);
+    prefs.load();                                                               // Read flash
+    spi.SetElecOffset(E_OFFSET);                                                // Set position sensor offset
     int lut[128] = {0};
     memcpy(&lut, &ENCODER_LUT, sizeof(lut));
-    spi.WriteLUT(lut);
+    spi.WriteLUT(lut);                                                          // Set potision sensor nonlinearity lookup table
     
     pc.baud(115200);                                                            // set serial baud rate
     wait(.01);
@@ -347,11 +347,6 @@ int main() {
     pc.attach(&serial_interrupt);                                               // attach serial interrupt
     
     state_change = 1;
-    //enter_menu_state(); //Print available commands, wait for command
-    //enter_calibration_mode();
-    //wait_us(100);
-    
-    //enter_torque_mode();
 
     
     while(1) {
