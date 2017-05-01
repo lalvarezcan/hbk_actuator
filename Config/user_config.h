@@ -8,9 +8,12 @@
 #define M_OFFSET                __float_reg[1]                                  // Encoder mechanical offset
 #define I_BW                    __float_reg[2]                                  // Current loop bandwidth
 #define TORQUE_LIMIT            __float_reg[3]                                  // Torque limit (current limit = torque_limit/(kt*gear ratio))
+#define THETA_MIN               __float_reg[4]                                  // Minimum position setpoint
+#define THETA_MAX               __float_reg[5]                                  // Maximum position setpoint
 
 #define PHASE_ORDER             __int_reg[0]                                    // Phase swapping during calibration
 #define CAN_ID                  __int_reg[1]                                    // CAN bus ID
+#define CAN_MASTER              __int_reg[2]                                    // CAN bus "master" ID
 #define ENCODER_LUT             __int_reg[4]                                    // Encoder offset LUT - 128 elements long
 
 extern float __float_reg[];

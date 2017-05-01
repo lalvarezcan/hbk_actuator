@@ -31,7 +31,8 @@ void order_phases(PositionSensor *ps, GPIOStruct *gpio, ControllerStruct *contro
     //ps->ZeroPosition();
     ps->Sample(); 
     wait_us(1000);
-    float theta_start = ps->GetMechPosition();                                  //get initial rotor position
+    //float theta_start = ps->GetMechPosition();                                  //get initial rotor position
+    float theta_start;
     controller->i_b = I_SCALE*(float)(controller->adc2_raw - controller->adc2_offset);    //Calculate phase currents from ADC readings
     controller->i_c = I_SCALE*(float)(controller->adc1_raw - controller->adc1_offset);
     controller->i_a = -controller->i_b - controller->i_c;
@@ -49,6 +50,7 @@ void order_phases(PositionSensor *ps, GPIOStruct *gpio, ControllerStruct *contro
         TIM1->CCR1 = 0x708*(1.0f-dtc_w);
        ps->Sample();                                                            //sample position sensor
        theta_actual = ps->GetMechPosition();
+       if(theta_ref==0){theta_start = theta_actual;}
        if(sample_counter > 200){
            sample_counter = 0 ;
         printf("%.4f   %.4f\n\r", theta_ref/(NPP), theta_actual);
@@ -107,6 +109,7 @@ void calibrate(PositionSensor *ps, GPIOStruct *gpio, ControllerStruct *controlle
     controller->i_a = -controller->i_b - controller->i_c;
     dq0(controller->theta_elec, controller->i_a, controller->i_b, controller->i_c, &controller->i_d, &controller->i_q);    //dq0 transform on currents
     float current = sqrt(pow(controller->i_d, 2) + pow(controller->i_q, 2));
+    printf(" Current Angle : Rotor Angle : Raw Encoder \n\r\n\r");
     for(int i = 0; i<n; i++){                                                   // rotate forwards
        for(int j = 0; j<n2; j++){   
         theta_ref += delta;
@@ -131,7 +134,7 @@ void calibrate(PositionSensor *ps, GPIOStruct *gpio, ControllerStruct *controlle
         printf("%.4f   %.4f    %d\n\r", theta_ref/(NPP), theta_actual, raw_f[i]);
        //theta_ref += delta;
         }
-    printf(" Current Angle : Rotor Angle : Raw Encoder \n\r\n\r");
+    
     for(int i = 0; i<n; i++){                                                   // rotate backwards
        for(int j = 0; j<n2; j++){
        theta_ref -= delta;
@@ -208,6 +211,7 @@ void calibrate(PositionSensor *ps, GPIOStruct *gpio, ControllerStruct *controlle
                 }
             lut[ind] = (int) ((error_filt[i*NPP] - mean)*(float)(ps->GetCPR())/(2.0f*PI));
             printf("%d   %d   %d   %f\n\r", i, ind, lut[ind],  cogging_current[i]);
+            wait(.001);
             }
             
         ps->WriteLUT(lut);                                                      // write lookup table to position sensor object

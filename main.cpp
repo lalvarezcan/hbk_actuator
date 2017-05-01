@@ -6,21 +6,28 @@
 
 #define REST_MODE 0
 #define CALIBRATION_MODE 1
-#define TORQUE_MODE 2
-#define PD_MODE 3
+#define MOTOR_MODE 2
 #define SETUP_MODE 4
 #define ENCODER_MODE 5
 
+#define P_MASK
+#define D_MASK
+#define KP_MASK
+#define KD_MASK
+#define TFF_MASK
 
+/*
 const unsigned int BOARDNUM = 0x2;
 //const unsigned int a_id =                            
-const unsigned int TX_ID = 0x0100;
 const unsigned int cmd_ID = (BOARDNUM<<8) + 0x7;
+*/
+const unsigned int TX_ID = 0x01;
 
-float __float_reg[64];
-int __int_reg[256];
 
-#include "CANnucleo.h"
+float __float_reg[64];                                                          // Floats stored in flash
+int __int_reg[256];                                                             // Ints stored in flash.  Includes position sensor calibration lookup table
+
+
 #include "mbed.h"
 #include "PositionSensor.h"
 #include "structs.h"
@@ -36,6 +43,7 @@ int __int_reg[256];
 #include "user_config.h"
 #include "PreferenceWriter.h"
 
+ 
 PreferenceWriter prefs(6);
 
 GPIOStruct gpio;
@@ -44,70 +52,112 @@ COMStruct com;
 VelocityEstimatorStruct velocity;
 
 
-CANnucleo::CAN          can(PB_8, PB_9);                                        // CAN Rx pin name, CAN Tx pin name
-CANnucleo::CANMessage   rxMsg;
-CANnucleo::CANMessage   txMsg;
-int                     ledState;
-int                     counter = 0;
-int canCmd = 1000;
-volatile bool           msgAvailable = false;
+//using namespace CANnucleo;
 
-DigitalOut toggle(PA_0);
-Ticker  loop;
-/**
- * @brief   'CAN receive-complete' interrup handler.
- * @note    Called on arrival of new CAN message.
- *          Keep it as short as possible.
- * @param   
- * @retval  
- */
-void onMsgReceived() {
-    msgAvailable = true;
-    //printf("ping\n\r");
-}
+CAN          can(PB_8, PB_9);                                        // CAN Rx pin name, CAN Tx pin name
+CANMessage   rxMsg;
+CANMessage   txMsg;
 
-void sendCMD(int TX_addr, int val){
-    txMsg.clear();      //clear Tx message storage
-    txMsg.id = TX_addr;
-    txMsg << val;
-    can.write(txMsg);
-    //wait(.1);
-    
-    }
-    
-void readCAN(void){
-    if(msgAvailable) { 
-    msgAvailable = false;                                                       // reset flag for next use
-    can.read(rxMsg);                                                            // read message into Rx message storage
-    // Filtering performed by software:           
-    if(rxMsg.id == cmd_ID) {                                                    // See comments in CAN.cpp for filtering performed by hardware
-            rxMsg >> canCmd;                                                    // extract first data item
-            }                                                                   
-        }
-    }
-    
-void cancontroller(void){
-    //printf("%d\n\r", canCmd);
-    readCAN();
-    //sendCMD(TX_ID, canCmd);
-
-    }
-    
 
 Serial pc(PA_2, PA_3);
 
-PositionSensorAM5147 spi(16384, 0.0, NPP);   
-PositionSensorEncoder encoder(4096, 0, 21); 
+PositionSensorAM5147 spi(16384, 0.0, NPP);  
+PositionSensorEncoder encoder(4096, 0, NPP); 
+
+
+DigitalOut toggle(PA_0);
 
 volatile int count = 0;
 volatile int state = REST_MODE;
 volatile int state_change;
 
+ #define P_MIN -12.5f
+ #define P_MAX 12.5f
+ #define V_MIN -30.0f
+ #define V_MAX 30.0f
+ #define KP_MIN 0.0f
+ #define KP_MAX 500.0f
+ #define KD_MIN 0.0f
+ #define KD_MAX 100.0f
+ #define T_MIN -18.0f
+ #define T_MAX 18.0f
+ 
+
+/// CAN Reply Packet Structure ///
+/// 16 bit position, between -4*pi and 4*pi
+/// 12 bit velocity, between -30 and + 30 rad/s
+/// 12 bit current, between -40 and 40;
+/// CAN Packet is 5 8-bit words
+/// Formatted as follows.  For each quantity, bit 0 is LSB
+/// 0: [position[15-8]]
+/// 1: [position[7-0]] 
+/// 2: [velocity[11-4]]
+/// 3: [velocity[3-0], current[11-8]]
+/// 4: [current[7-0]]
+void pack_reply(CANMessage *msg, float p, float v, float i){
+    int p_int = float_to_uint(p, P_MIN, P_MAX, 16);
+    int v_int = float_to_uint(v, V_MIN, V_MAX, 12);
+    int i_int = float_to_uint(i, -I_MAX, I_MAX, 12);
+    msg->data[0] = p_int>>8;
+    msg->data[1] = p_int&0xFF;
+    msg->data[2] = v_int>>4;
+    msg->data[3] = ((v_int&0xF)<<4) + (i_int>>8);
+    msg->data[4] = i_int&0xFF;
+    }
+    
+/// CAN Command Packet Structure ///
+/// 16 bit position command, between -4*pi and 4*pi
+/// 12 bit velocity command, between -30 and + 30 rad/s
+/// 12 bit kp, between 0 and 500 N-m/rad
+/// 12 bit kd, between 0 and 100 N-m*s/rad
+/// 12 bit feed forward torque, between -18 and 18 N-m
+/// CAN Packet is 8 8-bit words
+/// Formatted as follows.  For each quantity, bit 0 is LSB
+/// 0: [position[15-8]]
+/// 1: [position[7-0]] 
+/// 2: [velocity[11-4]]
+/// 3: [velocity[3-0], kp[11-8]]
+/// 4: [kp[7-0]]
+/// 5: [kd[11-4]]
+/// 6: [kd[3-0], torque[11-8]]
+/// 7: [torque[7-0]]
+void unpack_cmd(CANMessage msg, ControllerStruct * controller){
+    int p_int = (msg.data[0]<<8)|msg.data[1];
+    int v_int = (msg.data[2]<<4)|(msg.data[3]>>4);
+    int kp_int = ((msg.data[3]&0xF)<<8)|msg.data[4];
+    int kd_int = (msg.data[5]<<4)|(msg.data[6]>>4);
+    int t_int = ((msg.data[6]&0xF)<<8)|msg.data[7];
+    
+    controller->p_des = uint_to_float(p_int, P_MIN, P_MAX, 16);
+    controller->v_des = uint_to_float(v_int, V_MIN, V_MAX, 12);
+    controller->kp = uint_to_float(kp_int, KP_MIN, KP_MAX, 12);
+    controller->kd = uint_to_float(kd_int, KD_MIN, KD_MAX, 12);
+    controller->t_ff = uint_to_float(t_int, T_MIN, T_MAX, 12);
+    
+    /*
+    printf("Received   ");
+    printf("%.3f  %.3f  %.3f  %.3f  %.3f   %.3f", controller->p_des, controller->v_des, controller->kp, controller->kd, controller->t_ff, controller->i_q_ref);
+    printf("\n\r");
+    */
+    
+    }
+
+void onMsgReceived() {
+    //msgAvailable = true;
+    //printf("%.3f   %.3f   %.3f\n\r", controller.theta_mech, controller.dtheta_mech, controller.i_q);
+    can.read(rxMsg);  
+    if((rxMsg.id == CAN_ID) && (state == MOTOR_MODE)){
+        unpack_cmd(rxMsg, &controller);
+        pack_reply(&txMsg, controller.theta_mech, controller.dtheta_mech, controller.i_q);
+        can.write(txMsg);
+    }
+    
+}
+
 void enter_menu_state(void){
     printf("\n\r\n\r\n\r");
     printf(" Commands:\n\r");
-    printf(" t - Torque Mode\n\r");
-    printf(" p - PD Mode\n\r");
+    printf(" m - Motor Mode\n\r");
     printf(" c - Calibrate Encoder\n\r");
     printf(" s - Setup\n\r");
     printf(" e - Display Encoder\n\r");
@@ -121,6 +171,7 @@ void enter_setup_state(void){
     printf(" %-7s %-25s %-5s %-5s %-5s\n\r\n\r", "prefix", "parameter", "min", "max", "current value");
     printf(" %-7s %-25s %-5s %-5s %.1f\n\r", "b", "Current Bandwidth (Hz)", "100", "2000", I_BW);
     printf(" %-7s %-25s %-5s %-5s %-5i\n\r", "i", "CAN ID", "0", "127", CAN_ID);
+    printf(" %-7s %-25s %-5s %-5s %-5i\n\r", "m", "CAN Master ID", "0", "127", CAN_MASTER);
     printf(" %-7s %-25s %-5s %-5s %.1f\n\r", "l", "Torque Limit (N-m)", "0.0", "18.0", TORQUE_LIMIT);
     printf("\n\r To change a value, type 'prefix''value''ENTER'\n\r i.e. 'b1000''ENTER'\n\r\n\r");
     state_change = 0;
@@ -128,19 +179,19 @@ void enter_setup_state(void){
     
 void enter_torque_mode(void){
     controller.i_d_ref = 0;
-    controller.i_q_ref = 1;                                                     // Current Setpoints
+    controller.i_q_ref = 6;                                                     // Current Setpoints
     reset_foc(&controller);                                                     // Tesets integrators, and other control loop parameters
     gpio.enable->write(1);                                                      // Enable gate drive
-    GPIOC->ODR ^= (1 << 5);                                                     // Turn on status LED
+    GPIOC->ODR |= (1 << 5);                                                     // Turn on status LED
     state_change = 0;
     }
     
 void calibrate(void){
     gpio.enable->write(1);                                                      // Enable gate drive
-    GPIOC->ODR ^= (1 << 5);                                                     // Turn on status LED
+    GPIOC->ODR |= (1 << 5);                                                     // Turn on status LED
     order_phases(&spi, &gpio, &controller, &prefs);                             // Check phase ordering
     calibrate(&spi, &gpio, &controller, &prefs);                                // Perform calibration procedure
-    GPIOC->ODR ^= (1 << 5);                                                     // Turn off status LED
+    GPIOC->ODR &= !(1 << 5);                                                     // Turn off status LED
     wait(.2);
     gpio.enable->write(0);                                                      // Turn off gate drive
     printf("\n\r Calibration complete.  Press 'esc' to return to menu\n\r");
@@ -184,23 +235,30 @@ extern "C" void TIM1_UP_TIM10_IRQHandler(void) {
                     }
                 break;
              
-            case TORQUE_MODE:                                                   // Run torque control
+            case MOTOR_MODE:                                                   // Run torque control
                 if(state_change){
                     enter_torque_mode();
                     }
                 count++;
-                controller.theta_elec = spi.GetElecPosition();                  
+                toggle.write(1);
+                controller.theta_elec = spi.GetElecPosition();
+                controller.theta_mech = spi.GetMechPosition();
+                controller.dtheta_mech = spi.GetMechVelocity();  
+                //TIM1->CCR3 = 0x708*(1.0f);
+                //TIM1->CCR1 = 0x708*(1.0f);
+                //TIM1->CCR2 = 0x708*(1.0f);     
+                
+                //controller.i_q_ref = controller.t_ff/KT_OUT;   
+                //torque_control(&controller);      
+                controller.i_q_ref = 1; 
                 commutate(&controller, &gpio, controller.theta_elec);           // Run current loop
                 spi.Sample();                                                   // Sample position sensor
+                toggle.write(0);
+                
                 if(count > 100){
                      count = 0;
-                     //readCAN();
-                     //controller.i_q_ref = ((float)(canCmd-1000))/100;
-                    //pc.printf("%f\n\r ", controller.theta_elec);
+                     //printf("%d  %d\n\r", controller.adc1_raw, controller.adc2_raw);
                      }
-                break;
-            
-            case PD_MODE:
                 break;
             case SETUP_MODE:
                 if(state_change){
@@ -211,9 +269,7 @@ extern "C" void TIM1_UP_TIM10_IRQHandler(void) {
                 print_encoder();
                 break;
                 }
-                
-   
-            
+                 
       }
   TIM1->SR = 0x0;                                                               // reset the status register
 }
@@ -233,6 +289,7 @@ void serial_interrupt(void){
                 state_change = 1;
                 char_count = 0;
                 cmd_id = 0;
+                GPIOC->ODR &= !(1 << 5); 
                 for(int i = 0; i<8; i++){cmd_val[i] = 0;}
                 }
         if(state == REST_MODE){
@@ -241,8 +298,8 @@ void serial_interrupt(void){
                     state = CALIBRATION_MODE;
                     state_change = 1;
                     break;
-                case 't':
-                    state = TORQUE_MODE;
+                case 'm':
+                    state = MOTOR_MODE;
                     state_change = 1;
                     break;
                 case 'e':
@@ -263,6 +320,9 @@ void serial_interrupt(void){
                         break;
                     case 'i':
                         CAN_ID = atoi(cmd_val);
+                        break;
+                    case 'm':
+                        CAN_MASTER = atoi(cmd_val);
                         break;
                     case 'l':
                         TORQUE_LIMIT = fmaxf(fminf(atof(cmd_val), 18.0f), 0.0f);
@@ -310,24 +370,27 @@ int main() {
     Init_All_HW(&gpio);                                                         // Setup PWM, ADC, GPIO
 
     wait(.1);
-    //TIM1->CR1 |= TIM_CR1_UDIS;
-    gpio.enable->write(1);                                                      // Enable gate drive
-    gpio.pwm_u->write(1.0f);                                                    // Write duty cycles
-    gpio.pwm_v->write(1.0f);
-    gpio.pwm_w->write(1.0f);
+    gpio.enable->write(1);
+    TIM1->CCR3 = 0x708*(1.0f);                        // Write duty cycles
+    TIM1->CCR2 = 0x708*(1.0f);
+    TIM1->CCR1 = 0x708*(1.0f);
     zero_current(&controller.adc1_offset, &controller.adc2_offset);             // Measure current sensor zero-offset
-    //gpio.enable->write(0);
+    gpio.enable->write(0);
     reset_foc(&controller);                                                     // Reset current controller
-    
-    TIM1->CR1 ^= TIM_CR1_UDIS; //enable interrupt
+    TIM1->CR1 ^= TIM_CR1_UDIS;
+    //TIM1->CR1 |= TIM_CR1_UDIS; //enable interrupt
     
     wait(.1);
     NVIC_SetPriority(TIM5_IRQn, 2);                                             // set interrupt priority
 
+
     can.frequency(1000000);                                                     // set bit rate to 1Mbps
-    can.attach(&onMsgReceived);                                                 // attach 'CAN receive-complete' interrupt handler
-    can.filter(0x020 << 25, 0xF0000004, CANAny, 0);
-    
+    can.filter(CAN_ID<<21, 0xFFE00004, CANStandard, 0);
+    //can.filter(CAN_ID, 0xF, CANStandard, 0);
+    can.attach(&onMsgReceived);                                     // attach 'CAN receive-complete' interrupt handler                                                                    
+    txMsg.id = TX_ID;
+    txMsg.len = 5;
+    rxMsg.len = 8;
     
     prefs.load();                                                               // Read flash
     spi.SetElecOffset(E_OFFSET);                                                // Set position sensor offset
@@ -335,7 +398,7 @@ int main() {
     memcpy(&lut, &ENCODER_LUT, sizeof(lut));
     spi.WriteLUT(lut);                                                          // Set potision sensor nonlinearity lookup table
     
-    pc.baud(115200);                                                            // set serial baud rate
+    pc.baud(921600);                                                            // set serial baud rate
     wait(.01);
     pc.printf("\n\r\n\r HobbyKing Cheetah\n\r\n\r");
     wait(.01);

@@ -11,8 +11,8 @@ PositionSensorAM5147::PositionSensorAM5147(int CPR, float offset, int ppairs){
     ElecOffset = offset;
     rotations = 0;
     spi = new SPI(PC_12, PC_11, PC_10);
-    spi->format(16, 1);
-    spi->frequency(5000000);
+    spi->format(8, 1);                                                          // mbed v>127 breaks 16-bit spi, so transaction is broken into 2 8-bit words
+    spi->frequency(25000000);
     cs = new DigitalOut(PA_15);
     cs->write(1);
     readAngleCmd = 0xffff;   
@@ -25,7 +25,10 @@ PositionSensorAM5147::PositionSensorAM5147(int CPR, float offset, int ppairs){
     
 void PositionSensorAM5147::Sample(){
     cs->write(0);
-    raw = spi->write(readAngleCmd);
+    int raw1 = spi->write(0xFF);
+    int raw2 = spi->write(0xFF);
+    raw = (raw1<<8)|raw2;
+    //raw = spi->write(readAngleCmd);
     raw &= 0x3FFF;                                                              //Extract last 14 bits
     cs->write(1);
     int off_1 = offset_lut[raw>>7];
@@ -44,7 +47,7 @@ void PositionSensorAM5147::Sample(){
     modPosition = ((6.28318530718f * ((float) angle))/ (float)_CPR);
     position = (6.28318530718f * ((float) angle+(_CPR*rotations)))/ (float)_CPR;
     MechPosition = position - MechOffset;
-    float elec = ((6.28318530718f/(float)_CPR) * (float) ((_ppairs*angle)%_CPR)) - ElecOffset;
+    float elec = ((6.28318530718f/(float)_CPR) * (float) ((_ppairs*angle)%_CPR)) + ElecOffset;
     if(elec < 0) elec += 6.28318530718f;
     else if(elec > 6.28318530718f) elec -= 6.28318530718f ; 
     ElecPosition = elec;
