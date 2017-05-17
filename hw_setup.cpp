@@ -34,7 +34,7 @@ void Init_PWM(GPIOStruct *gpio){
 
     TIM1->PSC = 0x0;                                            // no prescaler, timer counts up in sync with the peripheral clock
     //TIM1->ARR = 0x1194; // 20 khz
-    TIM1->ARR = 0x8CA;                                          // set auto reload, 40 khz
+    TIM1->ARR = PWM_ARR;                                          // set auto reload, 40 khz
     TIM1->CCER |= ~(TIM_CCER_CC1NP);                            // Interupt when low side is on.
     TIM1->CR1 |= TIM_CR1_CEN;                                   // enable TIM1
     

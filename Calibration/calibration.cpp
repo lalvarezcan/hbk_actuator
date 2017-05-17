@@ -23,9 +23,9 @@ void order_phases(PositionSensor *ps, GPIOStruct *gpio, ControllerStruct *contro
     abc(theta_ref, v_d, v_q, &v_u, &v_v, &v_w);                                 //inverse dq0 transform on voltages
     svm(1.0, v_u, v_v, v_w, &dtc_u, &dtc_v, &dtc_w);                            //space vector modulation
     for(int i = 0; i<20000; i++){
-        TIM1->CCR3 = 0x708*(1.0f-dtc_u);                                        // Set duty cycles
-        TIM1->CCR2 = 0x708*(1.0f-dtc_v);
-        TIM1->CCR1 = 0x708*(1.0f-dtc_w);
+        TIM1->CCR3 = (PWM_ARR>>1)*(1.0f-dtc_u);                                        // Set duty cycles
+        TIM1->CCR2 = (PWM_ARR>>1)*(1.0f-dtc_v);
+        TIM1->CCR1 = (PWM_ARR>>1)*(1.0f-dtc_w);
         wait_us(100);
         }
     //ps->ZeroPosition();
@@ -45,9 +45,9 @@ void order_phases(PositionSensor *ps, GPIOStruct *gpio, ControllerStruct *contro
         abc(theta_ref, v_d, v_q, &v_u, &v_v, &v_w);                             //inverse dq0 transform on voltages
         svm(1.0, v_u, v_v, v_w, &dtc_u, &dtc_v, &dtc_w);                        //space vector modulation
         wait_us(100);
-        TIM1->CCR3 = 0x708*(1.0f-dtc_u);                                        //Set duty cycles
-        TIM1->CCR2 = 0x708*(1.0f-dtc_v);
-        TIM1->CCR1 = 0x708*(1.0f-dtc_w);
+        TIM1->CCR3 = (PWM_ARR>>1)*(1.0f-dtc_u);                                        //Set duty cycles
+        TIM1->CCR2 = (PWM_ARR>>1)*(1.0f-dtc_v);
+        TIM1->CCR1 = (PWM_ARR>>1)*(1.0f-dtc_w);
        ps->Sample();                                                            //sample position sensor
        theta_actual = ps->GetMechPosition();
        if(theta_ref==0){theta_start = theta_actual;}
@@ -92,14 +92,14 @@ void calibrate(PositionSensor *ps, GPIOStruct *gpio, ControllerStruct *controlle
     abc(theta_ref, v_d, v_q, &v_u, &v_v, &v_w);                                 // inverse dq0 transform on voltages
     svm(1.0, v_u, v_v, v_w, &dtc_u, &dtc_v, &dtc_w);                            // space vector modulation
     for(int i = 0; i<40000; i++){
-        TIM1->CCR3 = 0x708*(1.0f-dtc_u);                                        // Set duty cycles
+        TIM1->CCR3 = (PWM_ARR>>1)*(1.0f-dtc_u);                                        // Set duty cycles
         if(PHASE_ORDER){                                   
-            TIM1->CCR2 = 0x708*(1.0f-dtc_v);
-            TIM1->CCR1 = 0x708*(1.0f-dtc_w);
+            TIM1->CCR2 = (PWM_ARR>>1)*(1.0f-dtc_v);
+            TIM1->CCR1 = (PWM_ARR>>1)*(1.0f-dtc_w);
             }
         else{
-            TIM1->CCR1 = 0x708*(1.0f-dtc_v);
-            TIM1->CCR2 = 0x708*(1.0f-dtc_w);
+            TIM1->CCR1 = (PWM_ARR>>1)*(1.0f-dtc_v);
+            TIM1->CCR2 = (PWM_ARR>>1)*(1.0f-dtc_w);
             }
         wait_us(100);
         }
@@ -115,14 +115,14 @@ void calibrate(PositionSensor *ps, GPIOStruct *gpio, ControllerStruct *controlle
         theta_ref += delta;
        abc(theta_ref, v_d, v_q, &v_u, &v_v, &v_w);                              // inverse dq0 transform on voltages
        svm(1.0, v_u, v_v, v_w, &dtc_u, &dtc_v, &dtc_w);                         // space vector modulation
-        TIM1->CCR3 = 0x708*(1.0f-dtc_u);
+        TIM1->CCR3 = (PWM_ARR>>1)*(1.0f-dtc_u);
         if(PHASE_ORDER){                                                        // Check phase ordering
-            TIM1->CCR2 = 0x708*(1.0f-dtc_v);                                    // Set duty cycles
-            TIM1->CCR1 = 0x708*(1.0f-dtc_w);
+            TIM1->CCR2 = (PWM_ARR>>1)*(1.0f-dtc_v);                                    // Set duty cycles
+            TIM1->CCR1 = (PWM_ARR>>1)*(1.0f-dtc_w);
             }
         else{
-            TIM1->CCR1 = 0x708*(1.0f-dtc_v);
-            TIM1->CCR2 = 0x708*(1.0f-dtc_w);
+            TIM1->CCR1 = (PWM_ARR>>1)*(1.0f-dtc_v);
+            TIM1->CCR2 = (PWM_ARR>>1)*(1.0f-dtc_w);
             }
             wait_us(100);
             ps->Sample();
@@ -140,14 +140,14 @@ void calibrate(PositionSensor *ps, GPIOStruct *gpio, ControllerStruct *controlle
        theta_ref -= delta;
        abc(theta_ref, v_d, v_q, &v_u, &v_v, &v_w);                              // inverse dq0 transform on voltages
        svm(1.0, v_u, v_v, v_w, &dtc_u, &dtc_v, &dtc_w);                         // space vector modulation
-        TIM1->CCR3 = 0x708*(1.0f-dtc_u);
+        TIM1->CCR3 = (PWM_ARR>>1)*(1.0f-dtc_u);
         if(PHASE_ORDER){
-            TIM1->CCR2 = 0x708*(1.0f-dtc_v);
-            TIM1->CCR1 = 0x708*(1.0f-dtc_w);
+            TIM1->CCR2 = (PWM_ARR>>1)*(1.0f-dtc_v);
+            TIM1->CCR1 = (PWM_ARR>>1)*(1.0f-dtc_w);
             }
         else{
-            TIM1->CCR1 = 0x708*(1.0f-dtc_v);
-            TIM1->CCR2 = 0x708*(1.0f-dtc_w);
+            TIM1->CCR1 = (PWM_ARR>>1)*(1.0f-dtc_v);
+            TIM1->CCR2 = (PWM_ARR>>1)*(1.0f-dtc_w);
             }
             wait_us(100);
             ps->Sample();

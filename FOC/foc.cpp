@@ -1,4 +1,5 @@
 #include "user_config.h"
+#include "hw_config.h"
 #include "foc.h"
 
 #include "FastMath.h"
@@ -44,9 +45,9 @@ void zero_current(int *offset_1, int *offset_2){                                
     int adc2_offset = 0;
     int n = 1024;
     for (int i = 0; i<n; i++){                                                  // Average n samples of the ADC
-        TIM1->CCR3 = 0x708*(1.0f);                                               // Write duty cycles
-        TIM1->CCR2 = 0x708*(1.0f);
-        TIM1->CCR1 = 0x708*(1.0f);
+        TIM1->CCR3 = (PWM_ARR>>1)*(1.0f);                                               // Write duty cycles
+        TIM1->CCR2 = (PWM_ARR>>1)*(1.0f);
+        TIM1->CCR1 = (PWM_ARR>>1)*(1.0f);
         ADC1->CR2  |= 0x40000000;                                               // Begin sample and conversion
         wait(.001);
         adc2_offset += ADC2->DR;
@@ -79,7 +80,7 @@ void commutate(ControllerStruct *controller, GPIOStruct *gpio, float theta){
        float s = FastSin(theta); 
        float c = FastCos(theta);                            
        //dq0(controller->theta_elec, controller->i_a, controller->i_b, controller->i_c, &controller->i_d, &controller->i_q);    //dq0 transform on currents
-       controller->i_d = 0.6666667f*(c*controller->i_a + (0.86602540378f*s-.5f*c)*controller->i_b + (-0.86602540378f*s-.5f*c)*controller->i_c);   ///Fast DQ0 Transform
+       controller->i_d = 0.6666667f*(c*controller->i_a + (0.86602540378f*s-.5f*c)*controller->i_b + (-0.86602540378f*s-.5f*c)*controller->i_c);   ///Faster DQ0 Transform
        controller->i_q = 0.6666667f*(-s*controller->i_a - (-0.86602540378f*c-.5f*s)*controller->i_b - (0.86602540378f*c-.5f*s)*controller->i_c);
        ///Cogging compensation lookup, doesn't actually work yet///
        //int ind = theta * (128.0f/(2.0f*PI));
@@ -107,21 +108,21 @@ void commutate(ControllerStruct *controller, GPIOStruct *gpio, float theta){
        limit_norm(&controller->v_d, &controller->v_q, controller->v_bus);       // Normalize voltage vector to lie within curcle of radius v_bus
        //abc(controller->theta_elec, controller->v_d, controller->v_q, &controller->v_u, &controller->v_v, &controller->v_w); //inverse dq0 transform on voltages
     
-        controller->v_u = c*controller->v_d - s*controller->v_q;
+        controller->v_u = c*controller->v_d - s*controller->v_q;                // Faster Inverse DQ0 transform
         controller->v_v = (0.86602540378f*s-.5f*c)*controller->v_d - (-0.86602540378f*c-.5f*s)*controller->v_q;
         controller->v_w = (-0.86602540378f*s-.5f*c)*controller->v_d - (0.86602540378f*c-.5f*s)*controller->v_q;
        svm(controller->v_bus, controller->v_u, controller->v_v, controller->v_w, &controller->dtc_u, &controller->dtc_v, &controller->dtc_w); //space vector modulation
 
        
        if(PHASE_ORDER){                                                         // Check which phase order to use, 
-            TIM1->CCR3 = 0x708*(1.0f-controller->dtc_u);                        // Write duty cycles
-            TIM1->CCR2 = 0x708*(1.0f-controller->dtc_v);
-            TIM1->CCR1 = 0x708*(1.0f-controller->dtc_w);
+            TIM1->CCR3 = (PWM_ARR>>1)*(1.0f-controller->dtc_u);                        // Write duty cycles
+            TIM1->CCR2 = (PWM_ARR>>1)*(1.0f-controller->dtc_v);
+            TIM1->CCR1 = (PWM_ARR>>1)*(1.0f-controller->dtc_w);
         }
         else{
-            TIM1->CCR3 = 0x708*(1.0f-controller->dtc_u);
-            TIM1->CCR1 = 0x708*(1.0f-controller->dtc_v);
-            TIM1->CCR2 = 0x708*(1.0f-controller->dtc_w);
+            TIM1->CCR3 = (PWM_ARR>>1)*(1.0f-controller->dtc_u);
+            TIM1->CCR1 = (PWM_ARR>>1)*(1.0f-controller->dtc_v);
+            TIM1->CCR2 = (PWM_ARR>>1)*(1.0f-controller->dtc_w);
         }
 
        controller->theta_elec = theta;                                          //For some reason putting this at the front breaks thins

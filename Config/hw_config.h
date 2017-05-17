@@ -8,6 +8,7 @@
 #define I_SCALE 0.02014160156f  // Amps per A/D Count
 #define DTC_MAX 0.95f          // Max phase duty cycle
 #define DTC_MIN 0.05f          // Min phase duty cycle
+#define PWM_ARR 0x8CA           /// timer autoreload value
 
 
 #endif

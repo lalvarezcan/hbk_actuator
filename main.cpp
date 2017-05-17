@@ -249,8 +249,8 @@ extern "C" void TIM1_UP_TIM10_IRQHandler(void) {
                 //TIM1->CCR2 = 0x708*(1.0f);     
                 
                 //controller.i_q_ref = controller.t_ff/KT_OUT;   
-                //torque_control(&controller);      
-                controller.i_q_ref = 1; 
+                torque_control(&controller);      
+                //controller.i_q_ref = 1; 
                 commutate(&controller, &gpio, controller.theta_elec);           // Run current loop
                 spi.Sample();                                                   // Sample position sensor
                 toggle.write(0);
