@@ -6,7 +6,7 @@
 #include "FastPWM.h"
 
 void Init_PWM(GPIOStruct *gpio){
-    
+
     RCC->AHB1ENR |= RCC_AHB1ENR_GPIOCEN;                        // enable the clock to GPIOC
     RCC->APB1ENR |= 0x00000001;                                 // enable TIM2 clock
     RCC->APB2ENR |= RCC_APB2ENR_TIM1EN;                         // enable TIM1 clock

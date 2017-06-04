@@ -10,18 +10,6 @@
 #define SETUP_MODE 4
 #define ENCODER_MODE 5
 
-#define P_MASK
-#define D_MASK
-#define KP_MASK
-#define KD_MASK
-#define TFF_MASK
-
-/*
-const unsigned int BOARDNUM = 0x2;
-//const unsigned int a_id =                            
-const unsigned int cmd_ID = (BOARDNUM<<8) + 0x7;
-*/
-const unsigned int TX_ID = 0x01;
 
 
 float __float_reg[64];                                                          // Floats stored in flash
@@ -78,7 +66,7 @@ volatile int state_change;
  #define KP_MIN 0.0f
  #define KP_MAX 500.0f
  #define KD_MIN 0.0f
- #define KD_MAX 100.0f
+ #define KD_MAX 5.0f
  #define T_MIN -18.0f
  #define T_MAX 18.0f
  
@@ -98,11 +86,12 @@ void pack_reply(CANMessage *msg, float p, float v, float i){
     int p_int = float_to_uint(p, P_MIN, P_MAX, 16);
     int v_int = float_to_uint(v, V_MIN, V_MAX, 12);
     int i_int = float_to_uint(i, -I_MAX, I_MAX, 12);
-    msg->data[0] = p_int>>8;
-    msg->data[1] = p_int&0xFF;
-    msg->data[2] = v_int>>4;
-    msg->data[3] = ((v_int&0xF)<<4) + (i_int>>8);
-    msg->data[4] = i_int&0xFF;
+    msg->data[0] = CAN_ID;
+    msg->data[1] = p_int>>8;
+    msg->data[2] = p_int&0xFF;
+    msg->data[3] = v_int>>4;
+    msg->data[4] = ((v_int&0xF)<<4) + (i_int>>8);
+    msg->data[5] = i_int&0xFF;
     }
     
 /// CAN Command Packet Structure ///
@@ -122,23 +111,23 @@ void pack_reply(CANMessage *msg, float p, float v, float i){
 /// 6: [kd[3-0], torque[11-8]]
 /// 7: [torque[7-0]]
 void unpack_cmd(CANMessage msg, ControllerStruct * controller){
-    int p_int = (msg.data[0]<<8)|msg.data[1];
-    int v_int = (msg.data[2]<<4)|(msg.data[3]>>4);
-    int kp_int = ((msg.data[3]&0xF)<<8)|msg.data[4];
-    int kd_int = (msg.data[5]<<4)|(msg.data[6]>>4);
-    int t_int = ((msg.data[6]&0xF)<<8)|msg.data[7];
+        int p_int = (msg.data[0]<<8)|msg.data[1];
+        int v_int = (msg.data[2]<<4)|(msg.data[3]>>4);
+        int kp_int = ((msg.data[3]&0xF)<<8)|msg.data[4];
+        int kd_int = (msg.data[5]<<4)|(msg.data[6]>>4);
+        int t_int = ((msg.data[6]&0xF)<<8)|msg.data[7];
+        
+        controller->p_des = uint_to_float(p_int, P_MIN, P_MAX, 16);
+        controller->v_des = uint_to_float(v_int, V_MIN, V_MAX, 12);
+        controller->kp = uint_to_float(kp_int, KP_MIN, KP_MAX, 12);
+        controller->kd = uint_to_float(kd_int, KD_MIN, KD_MAX, 12);
+        controller->t_ff = uint_to_float(t_int, T_MIN, T_MAX, 12);
     
-    controller->p_des = uint_to_float(p_int, P_MIN, P_MAX, 16);
-    controller->v_des = uint_to_float(v_int, V_MIN, V_MAX, 12);
-    controller->kp = uint_to_float(kp_int, KP_MIN, KP_MAX, 12);
-    controller->kd = uint_to_float(kd_int, KD_MIN, KD_MAX, 12);
-    controller->t_ff = uint_to_float(t_int, T_MIN, T_MAX, 12);
     
-    /*
-    printf("Received   ");
-    printf("%.3f  %.3f  %.3f  %.3f  %.3f   %.3f", controller->p_des, controller->v_des, controller->kp, controller->kd, controller->t_ff, controller->i_q_ref);
-    printf("\n\r");
-    */
+    //printf("Received   ");
+    //printf("%.3f  %.3f  %.3f  %.3f  %.3f   %.3f", controller->p_des, controller->v_des, controller->kp, controller->kd, controller->t_ff, controller->i_q_ref);
+    //printf("\n\r");
+    
     
     }
 
@@ -146,11 +135,27 @@ void onMsgReceived() {
     //msgAvailable = true;
     //printf("%.3f   %.3f   %.3f\n\r", controller.theta_mech, controller.dtheta_mech, controller.i_q);
     can.read(rxMsg);  
-    if((rxMsg.id == CAN_ID) && (state == MOTOR_MODE)){
-        unpack_cmd(rxMsg, &controller);
-        pack_reply(&txMsg, controller.theta_mech, controller.dtheta_mech, controller.i_q);
-        can.write(txMsg);
-    }
+    
+    if((rxMsg.id == CAN_ID)){
+        controller.timeout = 0;
+        if(((rxMsg.data[0]==0xFF) & (rxMsg.data[1]==0xFF) & (rxMsg.data[2]==0xFF) & (rxMsg.data[3]==0xFF) & (rxMsg.data[4]==0xFF) & (rxMsg.data[5]==0xFF) & (rxMsg.data[6]==0xFF) & (rxMsg.data[7]==0xFC))){
+            state = MOTOR_MODE;
+            state_change = 1;
+            }
+        else if(((rxMsg.data[0]==0xFF) & (rxMsg.data[1]==0xFF) & (rxMsg.data[2]==0xFF) & (rxMsg.data[3]==0xFF) * (rxMsg.data[4]==0xFF) & (rxMsg.data[5]==0xFF) & (rxMsg.data[6]==0xFF) & (rxMsg.data[7]==0xFD))){
+            state = REST_MODE;
+            state_change = 1;
+            GPIOC->ODR &= !(1 << 5); 
+            }
+        else if(((rxMsg.data[0]==0xFF) & (rxMsg.data[1]==0xFF) & (rxMsg.data[2]==0xFF) & (rxMsg.data[3]==0xFF) * (rxMsg.data[4]==0xFF) & (rxMsg.data[5]==0xFF) & (rxMsg.data[6]==0xFF) & (rxMsg.data[7]==0xFE))){
+            spi.ZeroPosition();
+            }
+        else if(state == MOTOR_MODE){
+            unpack_cmd(rxMsg, &controller);
+            pack_reply(&txMsg, controller.theta_mech, controller.dtheta_mech, controller.i_q);
+            can.write(txMsg);
+            }
+        }
     
 }
 
@@ -168,22 +173,25 @@ void enter_menu_state(void){
 
 void enter_setup_state(void){
     printf("\n\r\n\r Configuration Options \n\r\n\n");
-    printf(" %-7s %-25s %-5s %-5s %-5s\n\r\n\r", "prefix", "parameter", "min", "max", "current value");
-    printf(" %-7s %-25s %-5s %-5s %.1f\n\r", "b", "Current Bandwidth (Hz)", "100", "2000", I_BW);
-    printf(" %-7s %-25s %-5s %-5s %-5i\n\r", "i", "CAN ID", "0", "127", CAN_ID);
-    printf(" %-7s %-25s %-5s %-5s %-5i\n\r", "m", "CAN Master ID", "0", "127", CAN_MASTER);
-    printf(" %-7s %-25s %-5s %-5s %.1f\n\r", "l", "Torque Limit (N-m)", "0.0", "18.0", TORQUE_LIMIT);
+    printf(" %-4s %-31s %-5s %-6s %-5s\n\r\n\r", "prefix", "parameter", "min", "max", "current value");
+    printf(" %-4s %-31s %-5s %-6s %.1f\n\r", "b", "Current Bandwidth (Hz)", "100", "2000", I_BW);
+    printf(" %-4s %-31s %-5s %-6s %-5i\n\r", "i", "CAN ID", "0", "127", CAN_ID);
+    printf(" %-4s %-31s %-5s %-6s %-5i\n\r", "m", "CAN Master ID", "0", "127", CAN_MASTER);
+    printf(" %-4s %-31s %-5s %-6s %.1f\n\r", "l", "Torque Limit (N-m)", "0.0", "18.0", TORQUE_LIMIT);
+    printf(" %-4s %-31s %-5s %-6s %d\n\r", "t", "CAN Timeout (cycles)(0 = none)", "0", "100000", CAN_TIMEOUT);
     printf("\n\r To change a value, type 'prefix''value''ENTER'\n\r i.e. 'b1000''ENTER'\n\r\n\r");
     state_change = 0;
     }
     
 void enter_torque_mode(void){
-    controller.i_d_ref = 0;
-    controller.i_q_ref = 6;                                                     // Current Setpoints
-    reset_foc(&controller);                                                     // Tesets integrators, and other control loop parameters
     gpio.enable->write(1);                                                      // Enable gate drive
+    reset_foc(&controller);                                                     // Tesets integrators, and other control loop parameters
+    wait(.001);
+    controller.i_d_ref = 0;
+    controller.i_q_ref = 0;                                                     // Current Setpoints
     GPIOC->ODR |= (1 << 5);                                                     // Turn on status LED
     state_change = 0;
+    printf("\n\r Entering Motor Mode \n\r");
     }
     
 void calibrate(void){
@@ -238,27 +246,38 @@ extern "C" void TIM1_UP_TIM10_IRQHandler(void) {
             case MOTOR_MODE:                                                   // Run torque control
                 if(state_change){
                     enter_torque_mode();
+                    count = 0;
                     }
+                else{
                 count++;
-                toggle.write(1);
+                //toggle.write(1);
                 controller.theta_elec = spi.GetElecPosition();
-                controller.theta_mech = spi.GetMechPosition();
-                controller.dtheta_mech = spi.GetMechVelocity();  
+                controller.theta_mech = (1.0f/GR)*spi.GetMechPosition();
+                controller.dtheta_mech = (1.0f/GR)*spi.GetMechVelocity();  
                 //TIM1->CCR3 = 0x708*(1.0f);
                 //TIM1->CCR1 = 0x708*(1.0f);
                 //TIM1->CCR2 = 0x708*(1.0f);     
                 
                 //controller.i_q_ref = controller.t_ff/KT_OUT;   
-                torque_control(&controller);      
-                //controller.i_q_ref = 1; 
+                
+                torque_control(&controller);     
+                if((controller.timeout > CAN_TIMEOUT) && (CAN_TIMEOUT > 0)){
+                    controller.i_d_ref = 0;
+                    controller.i_q_ref = 0;
+                    } 
+                //controller.i_q_ref = .5; 
                 commutate(&controller, &gpio, controller.theta_elec);           // Run current loop
                 spi.Sample();                                                   // Sample position sensor
-                toggle.write(0);
+                //toggle.write(0);
+                controller.timeout += 1;
                 
-                if(count > 100){
-                     count = 0;
-                     //printf("%d  %d\n\r", controller.adc1_raw, controller.adc2_raw);
+                if(count == 1){
+                     //count = 0;
+                     wait(.001);
+                    //printf(" Started commutating\n\r");
                      }
+                     }
+                     
                 break;
             case SETUP_MODE:
                 if(state_change){
@@ -327,6 +346,9 @@ void serial_interrupt(void){
                     case 'l':
                         TORQUE_LIMIT = fmaxf(fminf(atof(cmd_val), 18.0f), 0.0f);
                         break;
+                    case 't':
+                        CAN_TIMEOUT = atoi(cmd_val);
+                        break;
                     default:
                         printf("\n\r '%c' Not a valid command prefix\n\r\n\r", cmd_id);
                         break;
@@ -388,8 +410,8 @@ int main() {
     can.filter(CAN_ID<<21, 0xFFE00004, CANStandard, 0);
     //can.filter(CAN_ID, 0xF, CANStandard, 0);
     can.attach(&onMsgReceived);                                     // attach 'CAN receive-complete' interrupt handler                                                                    
-    txMsg.id = TX_ID;
-    txMsg.len = 5;
+    txMsg.id = CAN_MASTER;
+    txMsg.len = 6;
     rxMsg.len = 8;
     
     prefs.load();                                                               // Read flash

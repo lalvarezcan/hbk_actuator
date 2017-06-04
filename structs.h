@@ -29,6 +29,7 @@ typedef struct{
     int adc1_offset, adc2_offset;
     float i_d_ref, i_q_ref;
     int loop_count;
+    int timeout;
     int mode;
     float p_des, v_des, kp, kd, t_ff;
     float cogging[128];

@@ -92,6 +92,8 @@ float PositionSensorAM5147::GetMechVelocity(){
 
 void PositionSensorAM5147::ZeroPosition(){
     rotations = 0;
+    MechOffset = 0;
+    Sample();
     MechOffset = GetMechPosition();
     }
     

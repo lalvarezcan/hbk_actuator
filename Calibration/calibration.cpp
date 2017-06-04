@@ -8,12 +8,13 @@
 #include "user_config.h"
 
 void order_phases(PositionSensor *ps, GPIOStruct *gpio, ControllerStruct *controller, PreferenceWriter *prefs){   
+    
     ///Checks phase order, to ensure that positive Q current produces
     ///torque in the positive direction wrt the position sensor.
     printf("\n\r Checking phase ordering\n\r");
     float theta_ref = 0;
     float theta_actual = 0;
-    float v_d = .2;                                                             //Put all volts on the D-Axis
+    float v_d = .25;                                                             //Put all volts on the D-Axis
     float v_q = 0.0;
     float v_u, v_v, v_w = 0;
     float dtc_u, dtc_v, dtc_w = .5;
@@ -78,11 +79,14 @@ void calibrate(PositionSensor *ps, GPIOStruct *gpio, ControllerStruct *controlle
     float delta = 2*PI*NPP/(n*n2);                                              // change in angle between samples
     float error_f[n] = {0};                                                     // error vector rotating forwards
     float error_b[n] = {0};                                                     // error vector rotating backwards
+    const int  n_lut = 128;
+    int lut[n_lut]= {0};                                                        // clear any old lookup table before starting.
+    ps->WriteLUT(lut); 
     int raw_f[n] = {0};
     int raw_b[n] = {0};
     float theta_ref = 0;
     float theta_actual = 0;
-    float v_d = .2;                                                             // Put volts on the D-Axis
+    float v_d = .25;                                                             // Put volts on the D-Axis
     float v_q = 0.0;
     float v_u, v_v, v_w = 0;
     float dtc_u, dtc_v, dtc_w = .5;
@@ -200,8 +204,8 @@ void calibrate(PositionSensor *ps, GPIOStruct *gpio, ControllerStruct *controlle
             mean += error_filt[i]/n;
             }
         int raw_offset = (raw_f[0] + raw_b[n-1])/2;                             //Insensitive to errors in this direction, so 2 points is plenty
-        const int  n_lut = 128;
-        int lut[n_lut];
+        
+        
         printf("\n\r Encoder non-linearity compensation table\n\r");
         printf(" Sample Number : Lookup Index : Lookup Value : Cogging Current Lookup\n\r\n\r");
         for (int i = 0; i<n_lut; i++){                                          // build lookup table

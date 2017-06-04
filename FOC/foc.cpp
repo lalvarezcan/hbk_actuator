@@ -58,8 +58,17 @@ void zero_current(int *offset_1, int *offset_2){                                
     }
 
 void reset_foc(ControllerStruct *controller){
+    TIM1->CCR3 = (PWM_ARR>>1)*(0.5f);
+    TIM1->CCR1 = (PWM_ARR>>1)*(0.5f);
+    TIM1->CCR2 = (PWM_ARR>>1)*(0.5f);
+    controller->i_d_ref = 0;
+    controller->i_q_ref = 0;
+    controller->i_d = 0;
+    controller->i_q = 0;
     controller->q_int = 0;
     controller->d_int = 0;
+    controller->v_q = 0;
+    controller->v_d = 0;
     }
 
 
@@ -82,16 +91,14 @@ void commutate(ControllerStruct *controller, GPIOStruct *gpio, float theta){
        //dq0(controller->theta_elec, controller->i_a, controller->i_b, controller->i_c, &controller->i_d, &controller->i_q);    //dq0 transform on currents
        controller->i_d = 0.6666667f*(c*controller->i_a + (0.86602540378f*s-.5f*c)*controller->i_b + (-0.86602540378f*s-.5f*c)*controller->i_c);   ///Faster DQ0 Transform
        controller->i_q = 0.6666667f*(-s*controller->i_a - (-0.86602540378f*c-.5f*s)*controller->i_b - (0.86602540378f*c-.5f*s)*controller->i_c);
-       ///Cogging compensation lookup, doesn't actually work yet///
-       //int ind = theta * (128.0f/(2.0f*PI));
-       //float cogging_current = controller->cogging[ind];
+
        float cogging_current = 0.05f*s*controller->i_q_ref;
        
        /// PI Controller ///
        float i_d_error = controller->i_d_ref - controller->i_d;
-       float i_q_error = controller->i_q_ref - controller->i_q;// + cogging_current;
+       float i_q_error = controller->i_q_ref - controller->i_q + cogging_current;
        float v_d_ff = 2.0f*(2*controller->i_d_ref*R_PHASE);   //feed-forward voltage
-       float v_q_ff =  controller->dtheta_elec*WB*1.73205081;
+       float v_q_ff =  controller->dtheta_elec*WB*1.73205081f;
        controller->d_int += i_d_error;   
        controller->q_int += i_q_error;
        
@@ -101,6 +108,9 @@ void commutate(ControllerStruct *controller, GPIOStruct *gpio, float theta){
        limit_norm(&controller->d_int, &controller->q_int, V_BUS/(K_Q*KI_Q));        // Limit integrators to prevent windup
        controller->v_d = K_SCALE*I_BW*i_d_error + K_SCALE*I_BW*controller->d_int;// + v_d_ff;  
        controller->v_q = K_SCALE*I_BW*i_q_error + K_SCALE*I_BW*controller->q_int;// + v_q_ff; 
+       
+       //controller->v_q = 4.0f;;
+       //controller->v_d = 0.0f;
        
        //controller->v_d = v_d_ff;
        //controller->v_q = v_q_ff; 
@@ -128,11 +138,11 @@ void commutate(ControllerStruct *controller, GPIOStruct *gpio, float theta){
        controller->theta_elec = theta;                                          //For some reason putting this at the front breaks thins
        
 
-       if(controller->loop_count >400){
+       if(controller->loop_count >40){
            //controller->i_q_ref = -controller->i_q_ref;
           controller->loop_count  = 0;
            
-           //printf("%.1f  %.1f  %.1f  %.1f  %.1f\n\r", controller->i_d, controller->i_q, controller->v_d, controller->v_q, controller->dtheta_mech);
+           //printf("%.2f  %.2f  %.2f\n\r", controller->i_a, controller->i_b, controller->i_c);
            //printf("%f\n\r", controller->theta_elec);
            //pc.printf("%f    %f    %f\n\r", controller->i_a, controller->i_b, controller->i_c);
            //pc.printf("%f    %f\n\r", controller->i_d, controller->i_q);
@@ -142,7 +152,7 @@ void commutate(ControllerStruct *controller, GPIOStruct *gpio, float theta){
     
     
 void torque_control(ControllerStruct *controller){
-    float torque_ref = -controller->kp*(controller->p_des - controller->theta_mech) + controller->t_ff;// + controller->kd*(controller->v_des - GR*controller->dtheta_mech);
+    float torque_ref = controller->kp*(controller->p_des - controller->theta_mech) + controller->t_ff + controller->kd*(controller->v_des - controller->dtheta_mech);
     //float torque_ref = -.1*(controller->p_des - controller->theta_mech);
     controller->i_q_ref = torque_ref/KT_OUT;    
     controller->i_d_ref = 0;
