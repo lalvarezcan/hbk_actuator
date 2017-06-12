@@ -115,7 +115,7 @@ void commutate(ControllerStruct *controller, GPIOStruct *gpio, float theta){
        //controller->v_d = v_d_ff;
        //controller->v_q = v_q_ff; 
        
-       limit_norm(&controller->v_d, &controller->v_q, controller->v_bus);       // Normalize voltage vector to lie within curcle of radius v_bus
+       limit_norm(&controller->v_d, &controller->v_q, 1.2f*controller->v_bus);       // Normalize voltage vector to lie within curcle of radius v_bus
        //abc(controller->theta_elec, controller->v_d, controller->v_q, &controller->v_u, &controller->v_v, &controller->v_w); //inverse dq0 transform on voltages
     
         controller->v_u = c*controller->v_d - s*controller->v_q;                // Faster Inverse DQ0 transform
