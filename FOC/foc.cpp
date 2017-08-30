@@ -130,9 +130,9 @@ void commutate(ControllerStruct *controller, GPIOStruct *gpio, float theta){
             TIM1->CCR1 = (PWM_ARR)*(1.0f-controller->dtc_w);
         }
         else{
-            TIM1->CCR3 = (PWM_ARR>>1)*(1.0f-controller->dtc_u);
-            TIM1->CCR1 = (PWM_ARR>>1)*(1.0f-controller->dtc_v);
-            TIM1->CCR2 =  (PWM_ARR>>1)*(1.0f-controller->dtc_w);
+            TIM1->CCR3 = (PWM_ARR)*(1.0f-controller->dtc_u);
+            TIM1->CCR1 = (PWM_ARR)*(1.0f-controller->dtc_v);
+            TIM1->CCR2 =  (PWM_ARR)*(1.0f-controller->dtc_w);
         }
 
        controller->theta_elec = theta;                                          //For some reason putting this at the front breaks thins

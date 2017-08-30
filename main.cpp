@@ -10,6 +10,7 @@
 #define SETUP_MODE 4
 #define ENCODER_MODE 5
 
+#define VERSION_NUM "1.0.1"
 
 
 float __float_reg[64];                                                          // Floats stored in flash
@@ -272,8 +273,8 @@ extern "C" void TIM1_UP_TIM10_IRQHandler(void) {
                 controller.timeout += 1;
                 
                 if(count == 1){
-                     //count = 0;
-                     wait(.001);
+                     count = 0;
+                     //wait(.001);
                     //printf(" Started commutating\n\r");
                      }
                      }
@@ -425,6 +426,7 @@ int main() {
     pc.printf("\n\r\n\r HobbyKing Cheetah\n\r\n\r");
     wait(.01);
     printf("\n\r Debug Info:\n\r");
+    printf(" Firmware Version: %s\n\r", VERSION_NUM);
     printf(" ADC1 Offset: %d    ADC2 Offset: %d\n\r", controller.adc1_offset, controller.adc2_offset);
     printf(" Position Sensor Electrical Offset:   %.4f\n\r", E_OFFSET);
     printf(" CAN ID:  %d\n\r", CAN_ID);
