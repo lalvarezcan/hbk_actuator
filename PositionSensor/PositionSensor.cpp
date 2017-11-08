@@ -72,6 +72,7 @@ void PositionSensorAM5147::Sample(){
     velVec[0] = vel;
     MechVelocity =  sum/(float)n;
     ElecVelocity = MechVelocity*_ppairs;
+    ElecVelocityFilt = 0.99f*ElecVelocityFilt + 0.01f*ElecVelocity;
     }
 
 int PositionSensorAM5147::GetRawPosition(){

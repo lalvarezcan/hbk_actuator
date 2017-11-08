@@ -91,12 +91,13 @@ void commutate(ControllerStruct *controller, GPIOStruct *gpio, float theta){
        //dq0(controller->theta_elec, controller->i_a, controller->i_b, controller->i_c, &controller->i_d, &controller->i_q);    //dq0 transform on currents
        controller->i_d = 0.6666667f*(c*controller->i_a + (0.86602540378f*s-.5f*c)*controller->i_b + (-0.86602540378f*s-.5f*c)*controller->i_c);   ///Faster DQ0 Transform
        controller->i_q = 0.6666667f*(-s*controller->i_a - (-0.86602540378f*c-.5f*s)*controller->i_b - (0.86602540378f*c-.5f*s)*controller->i_c);
-
-       //float cogging_current = 0.05f*s*controller->i_q_ref;
+        controller->i_q_filt = .95f*controller->i_q_filt + .05f*controller->i_q;
+        float s_cog = sinf(12.0f*theta);
+       float cogging_current =-0.33f*s_cog + .25f*s;
        
        /// PI Controller ///
        float i_d_error = controller->i_d_ref - controller->i_d;
-       float i_q_error = controller->i_q_ref - controller->i_q;// + cogging_current;
+       float i_q_error = controller->i_q_ref - controller->i_q + cogging_current - 2.0f;
        float v_d_ff = 2.0f*(2*controller->i_d_ref*R_PHASE);   //feed-forward voltage
        float v_q_ff =  controller->dtheta_elec*WB*1.73205081f;
        controller->d_int += i_d_error;   
@@ -109,7 +110,7 @@ void commutate(ControllerStruct *controller, GPIOStruct *gpio, float theta){
        controller->v_d = K_SCALE*I_BW*i_d_error + K_SCALE*I_BW*KI_D*controller->d_int;// + v_d_ff;  
        controller->v_q = K_SCALE*I_BW*i_q_error + K_SCALE*I_BW*KI_Q*controller->q_int;// + v_q_ff; 
        
-       //controller->v_q = 4.0f;;
+       //controller->v_q = 4.0f;
        //controller->v_d = 0.0f;
        
        //controller->v_d = v_d_ff;

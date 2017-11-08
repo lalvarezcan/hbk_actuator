@@ -21,6 +21,12 @@ float fminf3(float x, float y, float z){
     /// Returns minimum of x, y, z ///
     return (x < y ? (x < z ? x : z) : (y < z ? y : z));
     }
+
+float roundf(float x){
+    /// Returns nearest integer ///
+    
+    return x < 0.0f ? ceilf(x - 0.5f) : floorf(x + 0.5f);
+    }
     
 void limit_norm(float *x, float *y, float limit){
     /// Scales the lenght of vector (x, y) to be <= limit ///

@@ -20,8 +20,8 @@ typedef struct{
     float i_a, i_b, i_c;
     float v_bus;
     float theta_mech, theta_elec;
-    float dtheta_mech, dtheta_elec;
-    float i_d, i_q;
+    float dtheta_mech, dtheta_elec, dtheta_elec_filt;
+    float i_d, i_q, i_q_filt;
     float v_d, v_q;
     float dtc_u, dtc_v, dtc_w;
     float v_u, v_v, v_w;

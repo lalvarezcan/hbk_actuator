@@ -53,7 +53,7 @@ public:
     virtual int GetCPR(void);
     virtual void WriteLUT(int new_lut[128]);
 private:
-    float position, ElecPosition, ElecOffset, MechPosition, MechOffset, modPosition, oldModPosition, oldVel, velVec[16], MechVelocity, ElecVelocity;
+    float position, ElecPosition, ElecOffset, MechPosition, MechOffset, modPosition, oldModPosition, oldVel, velVec[16], MechVelocity, ElecVelocity, ElecVelocityFilt;
     int raw, _CPR, rotations, old_counts, _ppairs;
     SPI *spi;
     DigitalOut *cs;

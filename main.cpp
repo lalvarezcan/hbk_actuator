@@ -16,7 +16,6 @@
 float __float_reg[64];                                                          // Floats stored in flash
 int __int_reg[256];                                                             // Ints stored in flash.  Includes position sensor calibration lookup table
 
-
 #include "mbed.h"
 #include "PositionSensor.h"
 #include "structs.h"
@@ -83,16 +82,16 @@ volatile int state_change;
 /// 2: [velocity[11-4]]
 /// 3: [velocity[3-0], current[11-8]]
 /// 4: [current[7-0]]
-void pack_reply(CANMessage *msg, float p, float v, float i){
+void pack_reply(CANMessage *msg, float p, float v, float t){
     int p_int = float_to_uint(p, P_MIN, P_MAX, 16);
     int v_int = float_to_uint(v, V_MIN, V_MAX, 12);
-    int i_int = float_to_uint(i, -I_MAX, I_MAX, 12);
+    int t_int = float_to_uint(t, -T_MAX, T_MAX, 12);
     msg->data[0] = CAN_ID;
     msg->data[1] = p_int>>8;
     msg->data[2] = p_int&0xFF;
     msg->data[3] = v_int>>4;
-    msg->data[4] = ((v_int&0xF)<<4) + (i_int>>8);
-    msg->data[5] = i_int&0xFF;
+    msg->data[4] = ((v_int&0xF)<<4) + (t_int>>8);
+    msg->data[5] = t_int&0xFF;
     }
     
 /// CAN Command Packet Structure ///
@@ -153,7 +152,7 @@ void onMsgReceived() {
             }
         else if(state == MOTOR_MODE){
             unpack_cmd(rxMsg, &controller);
-            pack_reply(&txMsg, controller.theta_mech, controller.dtheta_mech, controller.i_q);
+            pack_reply(&txMsg, controller.theta_mech, controller.dtheta_mech, controller.i_q_filt*KT_OUT);
             can.write(txMsg);
             }
         }
@@ -266,16 +265,16 @@ extern "C" void TIM1_UP_TIM10_IRQHandler(void) {
                     controller.i_d_ref = 0;
                     controller.i_q_ref = 0;
                     } 
-                //controller.i_q_ref = .5; 
+                //controller.i_q_ref = .4f;
                 commutate(&controller, &gpio, controller.theta_elec);           // Run current loop
                 spi.Sample();                                                   // Sample position sensor
                 //toggle.write(0);
                 controller.timeout += 1;
                 
-                if(count == 1){
+                if(count == 1000){
                      count = 0;
                      //wait(.001);
-                    //printf(" Started commutating\n\r");
+                    //printf("%f\n\r", controller.theta_elec);
                      }
                      }
                      
