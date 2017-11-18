@@ -97,7 +97,7 @@ void commutate(ControllerStruct *controller, GPIOStruct *gpio, float theta){
        
        /// PI Controller ///
        float i_d_error = controller->i_d_ref - controller->i_d;
-       float i_q_error = controller->i_q_ref - controller->i_q + cogging_current - 2.0f;
+       float i_q_error = controller->i_q_ref - controller->i_q + cogging_current;
        float v_d_ff = 2.0f*(2*controller->i_d_ref*R_PHASE);   //feed-forward voltage
        float v_q_ff =  controller->dtheta_elec*WB*1.73205081f;
        controller->d_int += i_d_error;   

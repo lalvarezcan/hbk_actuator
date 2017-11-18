@@ -63,7 +63,7 @@ void PositionSensorAM5147::Sample(){
         vel = (modPosition-oldModPosition)*40000.0f;
     }    
     
-    int n = 16;
+    int n = 40;
     float sum = vel;
     for (int i = 1; i < (n); i++){
         velVec[n - i] = velVec[n-i-1];
