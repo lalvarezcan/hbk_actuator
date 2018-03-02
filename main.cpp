@@ -10,7 +10,7 @@
 #define SETUP_MODE 4
 #define ENCODER_MODE 5
 
-#define VERSION_NUM "1.0.1"
+#define VERSION_NUM "1.2"
 
 
 float __float_reg[64];                                                          // Floats stored in flash
