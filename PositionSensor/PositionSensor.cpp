@@ -13,10 +13,11 @@ PositionSensorAM5147::PositionSensorAM5147(int CPR, float offset, int ppairs){
     spi = new SPI(PC_12, PC_11, PC_10);
     spi->format(16, 1);                                                          // mbed v>127 breaks 16-bit spi, so transaction is broken into 2 8-bit words
     spi->frequency(25000000);
+    
     cs = new DigitalOut(PA_15);
     cs->write(1);
     readAngleCmd = 0xffff;   
-    MechOffset = 0;
+    MechOffset = offset;
     modPosition = 0;
     oldModPosition = 0;
     oldVel = 0;
@@ -24,10 +25,10 @@ PositionSensorAM5147::PositionSensorAM5147(int CPR, float offset, int ppairs){
     }
     
 void PositionSensorAM5147::Sample(){
-    cs->write(0);
+    GPIOA->ODR &= ~(1 << 15);
     raw = spi->write(readAngleCmd);
     raw &= 0x3FFF;                                                              //Extract last 14 bits
-    cs->write(1);
+    GPIOA->ODR |= (1 << 15);
     int off_1 = offset_lut[raw>>7];
     int off_2 = offset_lut[((raw>>7)+1)%128];
     int off_interp = off_1 + ((off_2 - off_1)*(raw - ((raw>>7)<<7))>>7);        // Interpolate between lookup table entries
@@ -84,6 +85,10 @@ float PositionSensorAM5147::GetElecPosition(){
     return ElecPosition;
     }
 
+float PositionSensorAM5147::GetElecVelocity(){
+    return ElecVelocity;
+    }
+
 float PositionSensorAM5147::GetMechVelocity(){
     return MechVelocity;
     }
@@ -98,6 +103,9 @@ void PositionSensorAM5147::ZeroPosition(){
 void PositionSensorAM5147::SetElecOffset(float offset){
     ElecOffset = offset;
     }
+void PositionSensorAM5147::SetMechOffset(float offset){
+    MechOffset = offset;
+    }
 
 int PositionSensorAM5147::GetCPR(){
     return _CPR;
@@ -108,6 +116,7 @@ void PositionSensorAM5147::WriteLUT(int new_lut[128]){
     memcpy(offset_lut, new_lut, sizeof(offset_lut));
     }
     
+
 
 PositionSensorEncoder::PositionSensorEncoder(int CPR, float offset, int ppairs) {
     _ppairs = ppairs;

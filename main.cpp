@@ -10,7 +10,7 @@
 #define SETUP_MODE 4
 #define ENCODER_MODE 5
 
-#define VERSION_NUM "1.2"
+#define VERSION_NUM "1.4"
 
 
 float __float_reg[64];                                                          // Floats stored in flash
@@ -31,14 +31,14 @@ int __int_reg[256];                                                             
 #include "user_config.h"
 #include "PreferenceWriter.h"
 
+
  
 PreferenceWriter prefs(6);
 
 GPIOStruct gpio;
 ControllerStruct controller;
 COMStruct com;
-VelocityEstimatorStruct velocity;
-
+ObserverStruct observer;
 
 //using namespace CANnucleo;
 
@@ -50,10 +50,10 @@ CANMessage   txMsg;
 Serial pc(PA_2, PA_3);
 
 PositionSensorAM5147 spi(16384, 0.0, NPP);  
-PositionSensorEncoder encoder(4096, 0, NPP); 
+//PositionSensorEncoder encoder(4096, 0, NPP); 
 
 
-DigitalOut toggle(PA_0);
+DigitalOut toggle(PC_8);
 
 volatile int count = 0;
 volatile int state = REST_MODE;
@@ -61,8 +61,8 @@ volatile int state_change;
 
  #define P_MIN -12.5f
  #define P_MAX 12.5f
- #define V_MIN -30.0f
- #define V_MAX 30.0f
+ #define V_MIN -45.0f
+ #define V_MAX 45.0f
  #define KP_MIN 0.0f
  #define KP_MAX 500.0f
  #define KD_MIN 0.0f
@@ -122,20 +122,15 @@ void unpack_cmd(CANMessage msg, ControllerStruct * controller){
         controller->kp = uint_to_float(kp_int, KP_MIN, KP_MAX, 12);
         controller->kd = uint_to_float(kd_int, KD_MIN, KD_MAX, 12);
         controller->t_ff = uint_to_float(t_int, T_MIN, T_MAX, 12);
-    
-    
     //printf("Received   ");
     //printf("%.3f  %.3f  %.3f  %.3f  %.3f   %.3f", controller->p_des, controller->v_des, controller->kp, controller->kd, controller->t_ff, controller->i_q_ref);
     //printf("\n\r");
-    
-    
     }
 
 void onMsgReceived() {
     //msgAvailable = true;
     //printf("%.3f   %.3f   %.3f\n\r", controller.theta_mech, controller.dtheta_mech, controller.i_q);
     can.read(rxMsg);  
-    
     if((rxMsg.id == CAN_ID)){
         controller.timeout = 0;
         if(((rxMsg.data[0]==0xFF) & (rxMsg.data[1]==0xFF) & (rxMsg.data[2]==0xFF) & (rxMsg.data[3]==0xFF) & (rxMsg.data[4]==0xFF) & (rxMsg.data[5]==0xFF) & (rxMsg.data[6]==0xFF) & (rxMsg.data[7]==0xFC))){
@@ -145,16 +140,16 @@ void onMsgReceived() {
         else if(((rxMsg.data[0]==0xFF) & (rxMsg.data[1]==0xFF) & (rxMsg.data[2]==0xFF) & (rxMsg.data[3]==0xFF) * (rxMsg.data[4]==0xFF) & (rxMsg.data[5]==0xFF) & (rxMsg.data[6]==0xFF) & (rxMsg.data[7]==0xFD))){
             state = REST_MODE;
             state_change = 1;
-            GPIOC->ODR &= !(1 << 5); 
+            gpio.led->write(0);; 
             }
         else if(((rxMsg.data[0]==0xFF) & (rxMsg.data[1]==0xFF) & (rxMsg.data[2]==0xFF) & (rxMsg.data[3]==0xFF) * (rxMsg.data[4]==0xFF) & (rxMsg.data[5]==0xFF) & (rxMsg.data[6]==0xFF) & (rxMsg.data[7]==0xFE))){
             spi.ZeroPosition();
             }
         else if(state == MOTOR_MODE){
             unpack_cmd(rxMsg, &controller);
-            pack_reply(&txMsg, controller.theta_mech, controller.dtheta_mech, controller.i_q_filt*KT_OUT);
-            can.write(txMsg);
             }
+        pack_reply(&txMsg, controller.theta_mech, controller.dtheta_mech, controller.i_q_filt*KT_OUT);
+        can.write(txMsg);
         }
     
 }
@@ -166,9 +161,11 @@ void enter_menu_state(void){
     printf(" c - Calibrate Encoder\n\r");
     printf(" s - Setup\n\r");
     printf(" e - Display Encoder\n\r");
+    printf(" z - Set Zero Position\n\r");
     printf(" esc - Exit to Menu\n\r");
     state_change = 0;
     gpio.enable->write(0);
+    gpio.led->write(0);
     }
 
 void enter_setup_state(void){
@@ -184,32 +181,30 @@ void enter_setup_state(void){
     }
     
 void enter_torque_mode(void){
+    controller.ovp_flag = 0;
     gpio.enable->write(1);                                                      // Enable gate drive
     reset_foc(&controller);                                                     // Tesets integrators, and other control loop parameters
     wait(.001);
     controller.i_d_ref = 0;
     controller.i_q_ref = 0;                                                     // Current Setpoints
-    GPIOC->ODR |= (1 << 5);                                                     // Turn on status LED
+    gpio.led->write(1);                                                     // Turn on status LED
     state_change = 0;
     printf("\n\r Entering Motor Mode \n\r");
     }
     
 void calibrate(void){
     gpio.enable->write(1);                                                      // Enable gate drive
-    GPIOC->ODR |= (1 << 5);                                                     // Turn on status LED
+    gpio.led->write(1);                                                    // Turn on status LED
     order_phases(&spi, &gpio, &controller, &prefs);                             // Check phase ordering
     calibrate(&spi, &gpio, &controller, &prefs);                                // Perform calibration procedure
-    GPIOC->ODR &= !(1 << 5);                                                     // Turn off status LED
+    gpio.led->write(0);;                                                     // Turn off status LED
     wait(.2);
     gpio.enable->write(0);                                                      // Turn off gate drive
     printf("\n\r Calibration complete.  Press 'esc' to return to menu\n\r");
      state_change = 0;
-     
     }
     
 void print_encoder(void){
-    spi.Sample();
-    wait(.001);
     printf(" Mechanical Angle:  %f    Electrical Angle:  %f    Raw:  %d\n\r", spi.GetMechPosition(), spi.GetElecPosition(), spi.GetRawPosition());
     wait(.05);
     }
@@ -218,20 +213,25 @@ void print_encoder(void){
 /// This runs at 40 kHz, regardless of of the mode the controller is in ///
 extern "C" void TIM1_UP_TIM10_IRQHandler(void) {
   if (TIM1->SR & TIM_SR_UIF ) {
-        //toggle = 1;
 
         ///Sample current always ///
         ADC1->CR2  |= 0x40000000;                                               // Begin sample and conversion
         //volatile int delay;   
         //for (delay = 0; delay < 55; delay++);
-        controller.adc2_raw = ADC2->DR;                                         // Read ADC1 and ADC2 Data Registers
+        controller.adc2_raw = ADC2->DR;                                         // Read ADC Data Registers
         controller.adc1_raw = ADC1->DR;
+        controller.adc3_raw = ADC3->DR;
+        spi.Sample();                                                           // sample position sensor
+        controller.theta_elec = spi.GetElecPosition();
+        controller.theta_mech = (1.0f/GR)*spi.GetMechPosition();
+        controller.dtheta_mech = (1.0f/GR)*spi.GetMechVelocity();  
+        controller.dtheta_elec = spi.GetElecVelocity();
+        controller.v_bus = 0.95f*controller.v_bus + 0.05f*((float)controller.adc3_raw)*V_SCALE;
         ///
         
         /// Check state machine state, and run the appropriate function ///
-        //printf("%d\n\r", state);
         switch(state){
-            case REST_MODE:                                                     // Do nothing until
+            case REST_MODE:                                                     // Do nothing
                 if(state_change){
                     enter_menu_state();
                     }
@@ -249,35 +249,34 @@ extern "C" void TIM1_UP_TIM10_IRQHandler(void) {
                     count = 0;
                     }
                 else{
-                count++;
-                //toggle.write(1);
-                controller.theta_elec = spi.GetElecPosition();
-                controller.theta_mech = (1.0f/GR)*spi.GetMechPosition();
-                controller.dtheta_mech = (1.0f/GR)*spi.GetMechVelocity();  
-                //TIM1->CCR3 = 0x708*(1.0f);
-                //TIM1->CCR1 = 0x708*(1.0f);
-                //TIM1->CCR2 = 0x708*(1.0f);     
-                
-                //controller.i_q_ref = controller.t_ff/KT_OUT;   
-                
+                /*
+                if(controller.v_bus>28.0f){         //Turn of gate drive if bus voltage is too high, to prevent FETsplosion if the bus is cut during regen
+                    gpio.enable->write(0);
+                    controller.ovp_flag = 1;
+                    state = REST_MODE;
+                    state_change = 1;
+                    printf("OVP Triggered!\n\r");
+                    }
+                    */  
+
                 torque_control(&controller);     
                 if((controller.timeout > CAN_TIMEOUT) && (CAN_TIMEOUT > 0)){
                     controller.i_d_ref = 0;
                     controller.i_q_ref = 0;
+                    controller.kp = 0;
+                    controller.kd = 0;
+                    controller.t_ff = 0;
                     } 
-                //controller.i_q_ref = .4f;
-                commutate(&controller, &gpio, controller.theta_elec);           // Run current loop
-                spi.Sample();                                                   // Sample position sensor
-                //toggle.write(0);
+                commutate(&controller, &observer, &gpio, controller.theta_elec);           // Run current loop
                 controller.timeout += 1;
-                
+                /*
+                count++;
                 if(count == 1000){
                      count = 0;
-                     //wait(.001);
-                    //printf("%f\n\r", controller.theta_elec);
                      }
-                     }
-                     
+                     */
+            
+                }     
                 break;
             case SETUP_MODE:
                 if(state_change){
@@ -287,8 +286,7 @@ extern "C" void TIM1_UP_TIM10_IRQHandler(void) {
             case ENCODER_MODE:
                 print_encoder();
                 break;
-                }
-                 
+                }                 
       }
   TIM1->SR = 0x0;                                                               // reset the status register
 }
@@ -308,7 +306,7 @@ void serial_interrupt(void){
                 state_change = 1;
                 char_count = 0;
                 cmd_id = 0;
-                GPIOC->ODR &= !(1 << 5); 
+                gpio.led->write(0);; 
                 for(int i = 0; i<8; i++){cmd_val[i] = 0;}
                 }
         if(state == REST_MODE){
@@ -329,7 +327,21 @@ void serial_interrupt(void){
                     state = SETUP_MODE;
                     state_change = 1;
                     break;
-                    }
+                case 'z':
+                    spi.SetMechOffset(0);
+                    spi.Sample();
+                    wait_us(20);
+                    M_OFFSET = spi.GetMechPosition();
+                    if (!prefs.ready()) prefs.open();
+                        prefs.flush();                                                  // Write new prefs to flash
+                        prefs.close();    
+                        prefs.load(); 
+                    spi.SetMechOffset(M_OFFSET);
+                    printf("\n\r  Saved new zero position:  %.4f\n\r\n\r", M_OFFSET);
+                    
+                    break;
+                }
+                
                 }
         else if(state == SETUP_MODE){
             if(c == 13){
@@ -403,7 +415,8 @@ int main() {
     //TIM1->CR1 |= TIM_CR1_UDIS; //enable interrupt
     
     wait(.1);
-    NVIC_SetPriority(TIM5_IRQn, 2);                                             // set interrupt priority
+    NVIC_SetPriority(TIM1_UP_TIM10_IRQn, 2);                                             // commutation > communication
+    NVIC_SetPriority(CAN1_RX0_IRQn, 3);
 
 
     can.frequency(1000000);                                                     // set bit rate to 1Mbps
@@ -415,7 +428,10 @@ int main() {
     rxMsg.len = 8;
     
     prefs.load();                                                               // Read flash
+    if(isnan(E_OFFSET)){E_OFFSET = 0.0f;}
+    if(isnan(M_OFFSET)){M_OFFSET = 0.0f;}
     spi.SetElecOffset(E_OFFSET);                                                // Set position sensor offset
+    spi.SetMechOffset(M_OFFSET);
     int lut[128] = {0};
     memcpy(&lut, &ENCODER_LUT, sizeof(lut));
     spi.WriteLUT(lut);                                                          // Set potision sensor nonlinearity lookup table
@@ -428,6 +444,7 @@ int main() {
     printf(" Firmware Version: %s\n\r", VERSION_NUM);
     printf(" ADC1 Offset: %d    ADC2 Offset: %d\n\r", controller.adc1_offset, controller.adc2_offset);
     printf(" Position Sensor Electrical Offset:   %.4f\n\r", E_OFFSET);
+    printf(" Output Zero Position:  %.4f\n\r", M_OFFSET);
     printf(" CAN ID:  %d\n\r", CAN_ID);
         
     pc.attach(&serial_interrupt);                                               // attach serial interrupt

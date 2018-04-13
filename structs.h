@@ -8,6 +8,7 @@
 
 typedef struct{
     DigitalOut *enable;
+    DigitalOut *led;
     FastPWM *pwm_u, *pwm_v, *pwm_w;
     } GPIOStruct;
     
@@ -16,7 +17,7 @@ typedef struct{
     }COMStruct;
     
 typedef struct{
-    int adc1_raw, adc2_raw;
+    int adc1_raw, adc2_raw, adc3_raw;
     float i_a, i_b, i_c;
     float v_bus;
     float theta_mech, theta_elec;
@@ -31,19 +32,19 @@ typedef struct{
     int loop_count;
     int timeout;
     int mode;
+    int ovp_flag;
     float p_des, v_des, kp, kd, t_ff;
     float cogging[128];
     } ControllerStruct;
 
 typedef struct{
-    float vel_1;
-    float vel_1_old;
-    float vel_1_est;
-    float vel_2;
-    float vel_2_old;
-    float vel_2_est;
-    float ts;
-    float est;
-    } VelocityEstimatorStruct;
+    float theta_m, theta_est;
+    float thetadot_m, thetadot_est;
+    float i_d_m, i_d_est;
+    float i_q_m, i_q_est;
+    float i_d_dot, i_q_dot;
+    float e_d, e_q;
+    float e_d_int, e_q_int;
+    } ObserverStruct;
     
 #endif

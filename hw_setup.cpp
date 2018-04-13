@@ -33,7 +33,6 @@ void Init_PWM(GPIOStruct *gpio){
     //PWM Setup
 
     TIM1->PSC = 0x0;                                            // no prescaler, timer counts up in sync with the peripheral clock
-    //TIM1->ARR = 0x1194; // 20 khz
     TIM1->ARR = PWM_ARR;                                          // set auto reload, 40 khz
     TIM1->CCER |= ~(TIM_CCER_CC1NP);                            // Interupt when low side is on.
     TIM1->CR1 |= TIM_CR1_CEN;                                   // enable TIM1
@@ -41,17 +40,29 @@ void Init_PWM(GPIOStruct *gpio){
     }
 
 void Init_ADC(void){
-        // ADC Setup
+    // ADC Setup
+     RCC->APB2ENR |= RCC_APB2ENR_ADC3EN;                        // clock for ADC3
      RCC->APB2ENR |= RCC_APB2ENR_ADC2EN;                        // clock for ADC2
      RCC->APB2ENR |= RCC_APB2ENR_ADC1EN;                        // clock for ADC1
-    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOCEN;                        // Enable clock for GPIOC
      
-     ADC->CCR = 0x00000006;                                     // Regular simultaneous mode only
+     RCC->AHB1ENR |= RCC_AHB1ENR_GPIOCEN;                        // Enable clock for GPIOC
+     RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;                        // Enable clock for GPIOA
+    
+     ADC->CCR = 0x00000016;                                     // Regular simultaneous mode only
      ADC1->CR2 |= ADC_CR2_ADON;//0x00000001;                    // ADC1 ON
-     ADC1->SQR3 = 0x000000A;                                    // use PC_0 as input
-     ADC2->CR2 |= ADC_CR2_ADON;//0x00000001;                    // ADC1 ON
-     ADC2->SQR3 = 0x0000000B;                                   // use PC_1 as input
+     ADC1->SQR3 = 0x000000A;                                    // use PC_0 as input- ADC1_IN0
+     ADC2->CR2 |= ADC_CR2_ADON;//0x00000001;                    // ADC2 ON
+     ADC2->SQR3 = 0x0000000B;                                   // use PC_1 as input - ADC2_IN11
+     ADC3->CR2 |= ADC_CR2_ADON;                                 // ADC3 ON
+     ADC3->SQR3 = 0x00000000;                                   // use PA_0, - ADC3_IN0
      GPIOC->MODER |= 0x0000000f;                                // Alternate function, PC_0, PC_1 are analog inputs 
+     GPIOA->MODER |= 0x3;                                       // PA_0 as analog input
+     
+     ADC1->SMPR1 |= 0x1;                                        // 15 cycles on CH_10, 0b 001
+     ADC2->SMPR1 |= 0x8;                                        // 15 cycles on CH_11, 0b 0001 000
+     ADC3->SMPR2 |= 0x1;                                        // 15 cycles on CH_0, 0b 001;
+
+
 
     }
 
@@ -64,6 +75,7 @@ void Init_DAC(void){
 void Init_All_HW(GPIOStruct *gpio){
     Init_PWM(gpio);
     Init_ADC();
+    gpio->led = new DigitalOut(LED);
     //Init_DAC();
     
     }

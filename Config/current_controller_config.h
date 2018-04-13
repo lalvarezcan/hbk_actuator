@@ -1,6 +1,7 @@
 #ifndef CURRENT_CONTROLLER_CONFIG_H
 #define CURRENT_CONTROLLER_CONFIG_H
 
+// Current controller///
 #define K_D .05f                     // Volts/Amp
 #define K_Q .05f                     // Volts/Amp
 #define K_SCALE 0.0001f            // K_loop/Loop BW (Hz) 0.0042
@@ -12,6 +13,11 @@
 #define Q_INT_LIM V_BUS/(K_Q*KI_Q)  // Amps*samples
 
 #define I_MAX 40.0f
+
+//Observer//
+#define DT 0.000025f
+#define K_O 0.02f
+
 
 
 

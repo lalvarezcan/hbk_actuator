@@ -1,8 +1,5 @@
-#include "user_config.h"
-#include "hw_config.h"
-#include "foc.h"
 
-#include "FastMath.h"
+#include "foc.h"
 using namespace FastMath;
 
 
@@ -10,10 +7,12 @@ void abc( float theta, float d, float q, float *a, float *b, float *c){
     /// Inverse DQ0 Transform ///
     ///Phase current amplitude = lengh of dq vector///
     ///i.e. iq = 1, id = 0, peak phase current of 1///
-
-    *a = d*cosf(theta) - q*sinf(theta);
-    *b = d*cosf(theta - (2.0f*PI/3.0f)) - q*sinf(theta - (2.0f*PI/3.0f));
-    *c =  d*cosf(theta + (2.0f*PI/3.0f)) - q*sinf(theta +(2.0f*PI/3.0f));
+    float cf = FastCos(theta);
+    float sf = FastSin(theta);
+    
+    *a = cf*d - sf*q;                // Faster Inverse DQ0 transform
+    *b = (0.86602540378f*sf-.5f*cf)*d - (-0.86602540378f*cf-.5f*sf)*q;
+    *c = (-0.86602540378f*sf-.5f*cf)*d - (0.86602540378f*cf-.5f*sf)*q;
     }
     
     
@@ -22,11 +21,12 @@ void dq0(float theta, float a, float b, float c, float *d, float *q){
     ///Phase current amplitude = lengh of dq vector///
     ///i.e. iq = 1, id = 0, peak phase current of 1///
     
-    //float cos = cosf(theta);
-    //float sin = sinf(theta);
+    float cf = FastCos(theta);
+    float sf = FastSin(theta);
     
-    *d = (2.0f/3.0f)*(a*cosf(theta) + b*cosf(theta - (2.0f*PI/3.0f)) + c*cosf(theta + (2.0f*PI/3.0f)));
-    *q = (2.0f/3.0f)*(-a*sinf(theta) - b*sinf(theta - (2.0f*PI/3.0f)) - c*sinf(theta + (2.0f*PI/3.0f)));
+    *d = 0.6666667f*(cf*a + (0.86602540378f*sf-.5f*cf)*b + (-0.86602540378f*sf-.5f*cf)*c);   ///Faster DQ0 Transform
+    *q = 0.6666667f*(-sf*a - (-0.86602540378f*cf-.5f*sf)*b - (0.86602540378f*cf-.5f*sf)*c);
+       
     }
     
 void svm(float v_bus, float u, float v, float w, float *dtc_u, float *dtc_v, float *dtc_w){
@@ -65,6 +65,7 @@ void reset_foc(ControllerStruct *controller){
     controller->i_q_ref = 0;
     controller->i_d = 0;
     controller->i_q = 0;
+    controller->i_q_filt = 0;
     controller->q_int = 0;
     controller->d_int = 0;
     controller->v_q = 0;
@@ -72,9 +73,12 @@ void reset_foc(ControllerStruct *controller){
     }
 
 
-void commutate(ControllerStruct *controller, GPIOStruct *gpio, float theta){
-       /// Commutation Loop ///
+void commutate(ControllerStruct *controller, ObserverStruct *observer, GPIOStruct *gpio, float theta){
+       /// Observer Prediction ///
+       observer->i_d_est += DT*(observer->i_d_dot);
+       observer->i_q_est += DT*(observer->i_q_dot);
        
+       /// Commutation Loop ///
        controller->loop_count ++;   
        if(PHASE_ORDER){                                                                          // Check current sensor ordering
            controller->i_b = I_SCALE*(float)(controller->adc2_raw - controller->adc2_offset);    // Calculate phase currents from ADC readings
@@ -91,15 +95,31 @@ void commutate(ControllerStruct *controller, GPIOStruct *gpio, float theta){
        //dq0(controller->theta_elec, controller->i_a, controller->i_b, controller->i_c, &controller->i_d, &controller->i_q);    //dq0 transform on currents
        controller->i_d = 0.6666667f*(c*controller->i_a + (0.86602540378f*s-.5f*c)*controller->i_b + (-0.86602540378f*s-.5f*c)*controller->i_c);   ///Faster DQ0 Transform
        controller->i_q = 0.6666667f*(-s*controller->i_a - (-0.86602540378f*c-.5f*s)*controller->i_b - (0.86602540378f*c-.5f*s)*controller->i_c);
-        controller->i_q_filt = .95f*controller->i_q_filt + .05f*controller->i_q;
-        float s_cog = sinf(12.0f*theta);
-       float cogging_current =-0.33f*s_cog + .25f*s;
+        
+        controller->i_q_filt = 0.95f*controller->i_q_filt + 0.05f*controller->i_q;
+        observer->i_d_m = controller->i_d;
+        observer->i_q_m = controller->i_q;
+        
+        observer->e_d = observer->i_d_m - observer->i_d_est;
+        observer->e_q = observer->i_q_m - observer->i_q_est;
+        observer->e_d_int += observer->e_d;
+        observer->e_q_int += observer->e_q;
+        
+        observer->i_d_est +=  K_O*observer->e_d + .001f*observer->e_d_int;
+        observer->i_q_est += K_O*observer->e_q + .001f*observer->e_q_int;
+        
+        
+        //float s_cog = sinf(12.0f*theta);
+        
+        //float cogging_current =-0.33f*s_cog + .25f*s;
        
        /// PI Controller ///
        float i_d_error = controller->i_d_ref - controller->i_d;
-       float i_q_error = controller->i_q_ref - controller->i_q + cogging_current;
-       float v_d_ff = 2.0f*(2*controller->i_d_ref*R_PHASE);   //feed-forward voltage
-       float v_q_ff =  controller->dtheta_elec*WB*1.73205081f;
+       float i_q_error = controller->i_q_ref - controller->i_q ;// + cogging_current;
+       
+       float v_d_ff = 2.0f*(controller->i_d_ref*R_PHASE - controller->dtheta_elec*L_Q*controller->i_q_ref);   //feed-forward voltages
+       float v_q_ff =  2.0f*(controller->i_q_ref*R_PHASE  + controller->dtheta_elec*(L_D*controller->i_d_ref + WB));
+       
        controller->d_int += i_d_error;   
        controller->q_int += i_q_error;
        
@@ -116,7 +136,7 @@ void commutate(ControllerStruct *controller, GPIOStruct *gpio, float theta){
        //controller->v_d = v_d_ff;
        //controller->v_q = v_q_ff; 
        
-       limit_norm(&controller->v_d, &controller->v_q, 1.2f*controller->v_bus);       // Normalize voltage vector to lie within curcle of radius v_bus
+       limit_norm(&controller->v_d, &controller->v_q, 1.0f*controller->v_bus);       // Normalize voltage vector to lie within curcle of radius v_bus
        //abc(controller->theta_elec, controller->v_d, controller->v_q, &controller->v_u, &controller->v_v, &controller->v_w); //inverse dq0 transform on voltages
     
         controller->v_u = c*controller->v_d - s*controller->v_q;                // Faster Inverse DQ0 transform
@@ -124,6 +144,8 @@ void commutate(ControllerStruct *controller, GPIOStruct *gpio, float theta){
         controller->v_w = (-0.86602540378f*s-.5f*c)*controller->v_d - (0.86602540378f*c-.5f*s)*controller->v_q;
        svm(controller->v_bus, controller->v_u, controller->v_v, controller->v_w, &controller->dtc_u, &controller->dtc_v, &controller->dtc_w); //space vector modulation
 
+       observer->i_d_dot = 0.5f*(controller->v_d - 2.0f*(observer->i_d_est*R_PHASE - controller->dtheta_elec*L_Q*observer->i_q_est))/L_D;   //feed-forward voltage
+       observer->i_q_dot =  0.5f*(controller->v_q - 2.0f*(observer->i_q_est*R_PHASE  + controller->dtheta_elec*(L_D*observer->i_d_est + WB)))/L_Q;
        
        if(PHASE_ORDER){                                                         // Check which phase order to use, 
             TIM1->CCR3 = (PWM_ARR)*(1.0f-controller->dtc_u);                        // Write duty cycles
@@ -156,7 +178,7 @@ void torque_control(ControllerStruct *controller){
     float torque_ref = controller->kp*(controller->p_des - controller->theta_mech) + controller->t_ff + controller->kd*(controller->v_des - controller->dtheta_mech);
     //float torque_ref = -.1*(controller->p_des - controller->theta_mech);
     controller->i_q_ref = torque_ref/KT_OUT;    
-    controller->i_d_ref = 0;
+    controller->i_d_ref = 0.0f;
     }
 
 

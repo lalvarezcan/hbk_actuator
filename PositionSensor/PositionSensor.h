@@ -47,9 +47,11 @@ public:
     virtual float GetMechPosition();
     virtual float GetElecPosition();
     virtual float GetMechVelocity();
+    virtual float GetElecVelocity();
     virtual int GetRawPosition();
     virtual void ZeroPosition();
     virtual void SetElecOffset(float offset);
+    virtual void SetMechOffset(float offset);
     virtual int GetCPR(void);
     virtual void WriteLUT(int new_lut[128]);
 private:
