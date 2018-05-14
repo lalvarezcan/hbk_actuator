@@ -247,7 +247,6 @@ extern "C" void TIM1_UP_TIM10_IRQHandler(void) {
                 if(state_change){
                     enter_torque_mode();
                     count = 0;
-                    controller.t_ff = 15.0f;
                     }
                 else{
                 /*
@@ -271,11 +270,12 @@ extern "C" void TIM1_UP_TIM10_IRQHandler(void) {
                 commutate(&controller, &observer, &gpio, controller.theta_elec);           // Run current loop
                 controller.timeout += 1;
                 
+                /*
                 count++;
                 if(count == 40000){
-                     controller.t_ff = -controller.t_ff;
                      count = 0;
                      }
+                     */
                      
             
                 }     
