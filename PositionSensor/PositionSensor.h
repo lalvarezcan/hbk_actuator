@@ -4,6 +4,7 @@ class PositionSensor {
 public:
     virtual void Sample(void) = 0;
     virtual float GetMechPosition() {return 0.0f;}
+    virtual float GetMechPositionFixed() {return 0.0f;}
     virtual float GetElecPosition() {return 0.0f;}
     virtual float GetMechVelocity() {return 0.0f;}
     virtual float GetElecVelocity() {return 0.0f;}
@@ -45,6 +46,7 @@ public:
     PositionSensorAM5147(int CPR, float offset, int ppairs);
     virtual void Sample();
     virtual float GetMechPosition();
+    virtual float GetMechPositionFixed();
     virtual float GetElecPosition();
     virtual float GetMechVelocity();
     virtual float GetElecVelocity();

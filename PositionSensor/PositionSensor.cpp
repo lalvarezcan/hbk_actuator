@@ -76,6 +76,10 @@ void PositionSensorAM5147::Sample(){
 int PositionSensorAM5147::GetRawPosition(){
     return raw;
     }
+
+float PositionSensorAM5147::GetMechPositionFixed(){
+    return MechPosition+MechOffset;
+    }
     
 float PositionSensorAM5147::GetMechPosition(){
     return MechPosition;

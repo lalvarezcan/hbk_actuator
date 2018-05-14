@@ -32,7 +32,7 @@ void order_phases(PositionSensor *ps, GPIOStruct *gpio, ControllerStruct *contro
     //ps->ZeroPosition();
     ps->Sample(); 
     wait_us(1000);
-    //float theta_start = ps->GetMechPosition();                                  //get initial rotor position
+    //float theta_start = ps->GetMechPositionFixed();                                  //get initial rotor position
     float theta_start;
     controller->i_b = I_SCALE*(float)(controller->adc2_raw - controller->adc2_offset);    //Calculate phase currents from ADC readings
     controller->i_c = I_SCALE*(float)(controller->adc1_raw - controller->adc1_offset);
@@ -50,7 +50,7 @@ void order_phases(PositionSensor *ps, GPIOStruct *gpio, ControllerStruct *contro
         TIM1->CCR2 = (PWM_ARR>>1)*(1.0f-dtc_v);
         TIM1->CCR1 = (PWM_ARR>>1)*(1.0f-dtc_w);
        ps->Sample();                                                            //sample position sensor
-       theta_actual = ps->GetMechPosition();
+       theta_actual = ps->GetMechPositionFixed();
        if(theta_ref==0){theta_start = theta_actual;}
        if(sample_counter > 200){
            sample_counter = 0 ;
@@ -59,7 +59,7 @@ void order_phases(PositionSensor *ps, GPIOStruct *gpio, ControllerStruct *contro
         sample_counter++;
        theta_ref += 0.001f;
         }
-    float theta_end = ps->GetMechPosition();
+    float theta_end = ps->GetMechPositionFixed();
     int direction = (theta_end - theta_start)>0;
     printf("Theta Start:   %f    Theta End:  %f\n\r", theta_start, theta_end);
     printf("Direction:  %d\n\r", direction);
@@ -132,7 +132,7 @@ void calibrate(PositionSensor *ps, GPIOStruct *gpio, ControllerStruct *controlle
             ps->Sample();
         }
        ps->Sample();
-       theta_actual = ps->GetMechPosition();
+       theta_actual = ps->GetMechPositionFixed();
        error_f[i] = theta_ref/NPP - theta_actual;
        raw_f[i] = ps->GetRawPosition();
         printf("%.4f   %.4f    %d\n\r", theta_ref/(NPP), theta_actual, raw_f[i]);
@@ -157,7 +157,7 @@ void calibrate(PositionSensor *ps, GPIOStruct *gpio, ControllerStruct *controlle
             ps->Sample();
         }
        ps->Sample();                                                            // sample position sensor
-       theta_actual = ps->GetMechPosition();                                    // get mechanical position
+       theta_actual = ps->GetMechPositionFixed();                                    // get mechanical position
        error_b[i] = theta_ref/NPP - theta_actual;
        raw_b[i] = ps->GetRawPosition();
        printf("%.4f   %.4f    %d\n\r", theta_ref/(NPP), theta_actual, raw_b[i]);

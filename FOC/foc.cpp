@@ -109,13 +109,13 @@ void commutate(ControllerStruct *controller, ObserverStruct *observer, GPIOStruc
         observer->i_q_est += K_O*observer->e_q + .001f*observer->e_q_int;
         
         
-        //float s_cog = sinf(12.0f*theta);
-        
-        //float cogging_current =-0.33f*s_cog + .25f*s;
+        float scog12 = FastSin(12.0f*theta);
+        float scog1 = s;
+        float cogging_current = 0.25f*scog1 - 0.3f*scog12;
        
        /// PI Controller ///
        float i_d_error = controller->i_d_ref - controller->i_d;
-       float i_q_error = controller->i_q_ref - controller->i_q ;// + cogging_current;
+       float i_q_error = controller->i_q_ref - controller->i_q  + cogging_current;
        
        float v_d_ff = 2.0f*(controller->i_d_ref*R_PHASE - controller->dtheta_elec*L_Q*controller->i_q_ref);   //feed-forward voltages
        float v_q_ff =  2.0f*(controller->i_q_ref*R_PHASE  + controller->dtheta_elec*(L_D*controller->i_d_ref + WB));

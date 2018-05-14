@@ -10,7 +10,7 @@
 #define SETUP_MODE 4
 #define ENCODER_MODE 5
 
-#define VERSION_NUM "1.4"
+#define VERSION_NUM "1.5"
 
 
 float __float_reg[64];                                                          // Floats stored in flash
@@ -247,6 +247,7 @@ extern "C" void TIM1_UP_TIM10_IRQHandler(void) {
                 if(state_change){
                     enter_torque_mode();
                     count = 0;
+                    controller.t_ff = 15.0f;
                     }
                 else{
                 /*
@@ -269,12 +270,13 @@ extern "C" void TIM1_UP_TIM10_IRQHandler(void) {
                     } 
                 commutate(&controller, &observer, &gpio, controller.theta_elec);           // Run current loop
                 controller.timeout += 1;
-                /*
+                
                 count++;
-                if(count == 1000){
+                if(count == 40000){
+                     controller.t_ff = -controller.t_ff;
                      count = 0;
                      }
-                     */
+                     
             
                 }     
                 break;
