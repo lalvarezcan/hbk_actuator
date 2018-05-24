@@ -61,8 +61,8 @@ volatile int state_change;
 
  #define P_MIN -12.5f
  #define P_MAX 12.5f
- #define V_MIN -45.0f
- #define V_MAX 45.0f
+ #define V_MIN -650.0f
+ #define V_MAX 650.0f
  #define KP_MIN 0.0f
  #define KP_MAX 500.0f
  #define KD_MIN 0.0f
@@ -259,7 +259,7 @@ extern "C" void TIM1_UP_TIM10_IRQHandler(void) {
                     }
                     */  
 
-                torque_control(&controller);     
+                torque_control(&controller);    
                 if((controller.timeout > CAN_TIMEOUT) && (CAN_TIMEOUT > 0)){
                     controller.i_d_ref = 0;
                     controller.i_q_ref = 0;
@@ -272,7 +272,8 @@ extern "C" void TIM1_UP_TIM10_IRQHandler(void) {
                 
                 /*
                 count++;
-                if(count == 40000){
+                if(count == 4000){
+                     printf("%.4f\n\r", controller.dtheta_mech);
                      count = 0;
                      }
                      */
