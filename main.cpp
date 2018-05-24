@@ -61,8 +61,8 @@ volatile int state_change;
 
  #define P_MIN -12.5f
  #define P_MAX 12.5f
- #define V_MIN -650.0f
- #define V_MAX 650.0f
+ #define V_MIN -45.0f
+ #define V_MAX 45.0f
  #define KP_MIN 0.0f
  #define KP_MAX 500.0f
  #define KD_MIN 0.0f
