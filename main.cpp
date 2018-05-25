@@ -1,7 +1,6 @@
 /// high-bandwidth 3-phase motor control, for robots
 /// Written by benkatz, with much inspiration from bayleyw, nkirkby, scolton, David Otten, and others
 /// Hardware documentation can be found at build-its.blogspot.com
-
 /// Written for the STM32F446, but can be implemented on other STM32 MCU's with some further register-diddling
 
 #define REST_MODE 0
@@ -39,6 +38,7 @@ GPIOStruct gpio;
 ControllerStruct controller;
 COMStruct com;
 ObserverStruct observer;
+Serial pc(PA_2, PA_3);
 
 
 CAN          can(PB_8, PB_9);      // CAN Rx pin name, CAN Tx pin name
@@ -46,7 +46,6 @@ CANMessage   rxMsg;
 CANMessage   txMsg;
 
 
-Serial pc(PA_2, PA_3);
 
 PositionSensorAM5147 spi(16384, 0.0, NPP);  
 
@@ -328,7 +327,7 @@ void serial_interrupt(void){
     }
        
 int main() {
-    
+    can.frequency(1000000);                                                     // set bit rate to 1Mbps
     controller.v_bus = V_BUS;
     controller.mode = 0;
     Init_All_HW(&gpio);                                                         // Setup PWM, ADC, GPIO
@@ -346,16 +345,15 @@ int main() {
     
     wait(.1);
     NVIC_SetPriority(TIM1_UP_TIM10_IRQn, 2);                                             // commutation > communication
+    
     NVIC_SetPriority(CAN1_RX0_IRQn, 3);
-
-
-    can.frequency(1000000);                                                     // set bit rate to 1Mbps
     can.filter(CAN_ID<<21, 0xFFE00004, CANStandard, 0);
     //can.filter(CAN_ID, 0xF, CANStandard, 0);
-    can.attach(&onMsgReceived);                                     // attach 'CAN receive-complete' interrupt handler                                                                    
+                                                                    
     txMsg.id = CAN_MASTER;
     txMsg.len = 6;
     rxMsg.len = 8;
+    can.attach(&onMsgReceived);                                     // attach 'CAN receive-complete' interrupt handler    
     
     prefs.load();                                                               // Read flash
     if(isnan(E_OFFSET)){E_OFFSET = 0.0f;}
