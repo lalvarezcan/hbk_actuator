@@ -9,7 +9,7 @@
 #define SETUP_MODE 4
 #define ENCODER_MODE 5
 
-#define VERSION_NUM "1.5"
+#define VERSION_NUM "1.6"
 
 
 float __float_reg[64];                                                          // Floats stored in flash
@@ -30,7 +30,7 @@ int __int_reg[256];                                                             
 #include "user_config.h"
 #include "PreferenceWriter.h"
 #include "CAN_com.h"
-
+#include "DRV.h"
  
 PreferenceWriter prefs(6);
 
@@ -46,6 +46,10 @@ CANMessage   rxMsg;
 CANMessage   txMsg;
 
 
+SPI drv_spi(PA_7, PA_6, PA_5);
+DigitalOut drv_cs(PA_4);
+//DigitalOut drv_en_gate(PA_11);
+DRV832x drv(&drv_spi, &drv_cs);
 
 PositionSensorAM5147 spi(16384, 0.0, NPP);  
 
@@ -81,34 +85,50 @@ void onMsgReceived() {
 }
 
 void enter_menu_state(void){
+    drv.disable_gd();
     printf("\n\r\n\r\n\r");
     printf(" Commands:\n\r");
+    wait_us(10);
     printf(" m - Motor Mode\n\r");
+    wait_us(10);
     printf(" c - Calibrate Encoder\n\r");
+    wait_us(10);
     printf(" s - Setup\n\r");
+    wait_us(10);
     printf(" e - Display Encoder\n\r");
+    wait_us(10);
     printf(" z - Set Zero Position\n\r");
+    wait_us(10);
     printf(" esc - Exit to Menu\n\r");
+    wait_us(10);
     state_change = 0;
-    gpio.enable->write(0);
+    //gpio.enable->write(0);
     gpio.led->write(0);
     }
 
 void enter_setup_state(void){
     printf("\n\r\n\r Configuration Options \n\r\n\n");
+    wait_us(10);
     printf(" %-4s %-31s %-5s %-6s %-5s\n\r\n\r", "prefix", "parameter", "min", "max", "current value");
+    wait_us(10);
     printf(" %-4s %-31s %-5s %-6s %.1f\n\r", "b", "Current Bandwidth (Hz)", "100", "2000", I_BW);
+    wait_us(10);
     printf(" %-4s %-31s %-5s %-6s %-5i\n\r", "i", "CAN ID", "0", "127", CAN_ID);
+    wait_us(10);
     printf(" %-4s %-31s %-5s %-6s %-5i\n\r", "m", "CAN Master ID", "0", "127", CAN_MASTER);
+    wait_us(10);
     printf(" %-4s %-31s %-5s %-6s %.1f\n\r", "l", "Torque Limit (N-m)", "0.0", "18.0", TORQUE_LIMIT);
+    wait_us(10);
     printf(" %-4s %-31s %-5s %-6s %d\n\r", "t", "CAN Timeout (cycles)(0 = none)", "0", "100000", CAN_TIMEOUT);
+    wait_us(10);
     printf("\n\r To change a value, type 'prefix''value''ENTER'\n\r i.e. 'b1000''ENTER'\n\r\n\r");
+    wait_us(10);
     state_change = 0;
     }
     
 void enter_torque_mode(void){
+    drv.enable_gd();
     controller.ovp_flag = 0;
-    gpio.enable->write(1);                                                      // Enable gate drive
     reset_foc(&controller);                                                     // Tesets integrators, and other control loop parameters
     wait(.001);
     controller.i_d_ref = 0;
@@ -119,14 +139,14 @@ void enter_torque_mode(void){
     }
     
 void calibrate(void){
-    gpio.enable->write(1);                                                      // Enable gate drive
+    drv.enable_gd();
     gpio.led->write(1);                                                    // Turn on status LED
     order_phases(&spi, &gpio, &controller, &prefs);                             // Check phase ordering
     calibrate(&spi, &gpio, &controller, &prefs);                                // Perform calibration procedure
     gpio.led->write(0);;                                                     // Turn off status LED
     wait(.2);
-    gpio.enable->write(0);                                                      // Turn off gate drive
     printf("\n\r Calibration complete.  Press 'esc' to return to menu\n\r");
+    drv.disable_gd();
      state_change = 0;
     }
     
@@ -193,16 +213,20 @@ extern "C" void TIM1_UP_TIM10_IRQHandler(void) {
                     controller.kd = 0;
                     controller.t_ff = 0;
                     } 
-                commutate(&controller, &observer, &gpio, controller.theta_elec);           // Run current loop
+                //commutate(&controller, &observer, &gpio, controller.theta_elec);           // Run current loop
+                TIM1->CCR3 = (PWM_ARR)*(0.5f);                        // Write duty cycles
+                TIM1->CCR2 = (PWM_ARR)*(0.5f);
+                TIM1->CCR1 = (PWM_ARR)*(0.5f);
                 controller.timeout += 1;
                 
                 /*
                 count++;
                 if(count == 4000){
-                     printf("%.4f\n\r", controller.dtheta_mech);
+                     //printf("%.4f\n\r", controller.dtheta_mech);
+                     
                      count = 0;
                      }
-                     */
+                 */    
                      
             
                 }     
@@ -331,14 +355,29 @@ int main() {
     controller.v_bus = V_BUS;
     controller.mode = 0;
     Init_All_HW(&gpio);                                                         // Setup PWM, ADC, GPIO
-
     wait(.1);
+    
+    gpio.enable->write(1);
+    wait_us(100);
+    drv.write_DCR(0x0, 0x0, 0x0, PWM_MODE_3X, 0x0, 0x0, 0x0, 0x0, 0x1);
+    wait_us(100);
+    drv.write_CSACR(0x0, 0x1, 0x0, CSA_GAIN_40, 0x0, 0x0, 0x0, 0x0, 0x3);
+    wait_us(100);
+    
+    zero_current(&controller.adc1_offset, &controller.adc2_offset);             // Measure current sensor zero-offset
+
+
+    
+    
+    wait(.1);
+    /*
     gpio.enable->write(1);
     TIM1->CCR3 = 0x708*(1.0f);                        // Write duty cycles
     TIM1->CCR2 = 0x708*(1.0f);
     TIM1->CCR1 = 0x708*(1.0f);
-    zero_current(&controller.adc1_offset, &controller.adc2_offset);             // Measure current sensor zero-offset
     gpio.enable->write(0);
+    */
+
     reset_foc(&controller);                                                     // Reset current controller
     TIM1->CR1 ^= TIM_CR1_UDIS;
     //TIM1->CR1 |= TIM_CR1_UDIS; //enable interrupt
@@ -348,7 +387,6 @@ int main() {
     
     NVIC_SetPriority(CAN1_RX0_IRQn, 3);
     can.filter(CAN_ID<<21, 0xFFE00004, CANStandard, 0);
-    //can.filter(CAN_ID, 0xF, CANStandard, 0);
                                                                     
     txMsg.id = CAN_MASTER;
     txMsg.len = 6;
@@ -374,13 +412,36 @@ int main() {
     printf(" Position Sensor Electrical Offset:   %.4f\n\r", E_OFFSET);
     printf(" Output Zero Position:  %.4f\n\r", M_OFFSET);
     printf(" CAN ID:  %d\n\r", CAN_ID);
-        
+    
+
+
+
+    printf(" %d\n\r", drv.read_register(DCR));
+    wait_us(100);
+    printf(" %d\n\r", drv.read_register(CSACR));
+    
+    drv.disable_gd();
+    
     pc.attach(&serial_interrupt);                                               // attach serial interrupt
     
     state_change = 1;
-
     
-    while(1) {
 
+    int counter = 0;
+    while(1) {
+counter++;
+        if(counter>40000)
+        {   
+            //gpio.enable->write(1);
+            //wait_us(100);
+            //printf(" %d\n\r", drv.read_register(DCR));
+            //wait_us(100);
+            //printf(" %d\n\r", drv.read_register(CSACR));
+            drv.print_faults();
+            //printf("%d\n\r", drv.read_register(DCR));
+            counter = 0;
+            //gpio.enable->write(0);
+            }
+        wait_us(25);
     }
 }

@@ -6,6 +6,8 @@
 #include "foc.h"
 #include "PreferenceWriter.h"
 #include "user_config.h"
+#include "motor_config.h"
+#include "current_controller_config.h"
 
 void order_phases(PositionSensor *ps, GPIOStruct *gpio, ControllerStruct *controller, PreferenceWriter *prefs){   
     
@@ -14,10 +16,10 @@ void order_phases(PositionSensor *ps, GPIOStruct *gpio, ControllerStruct *contro
     printf("\n\r Checking phase ordering\n\r");
     float theta_ref = 0;
     float theta_actual = 0;
-    float v_d = .25;                                                             //Put all volts on the D-Axis
-    float v_q = 0.0;
+    float v_d = .15f;                                                             //Put all volts on the D-Axis
+    float v_q = 0.0f;
     float v_u, v_v, v_w = 0;
-    float dtc_u, dtc_v, dtc_w = .5;
+    float dtc_u, dtc_v, dtc_w = .5f;
     int sample_counter = 0;
     
     ///Set voltage angle to zero, wait for rotor position to settle
@@ -86,10 +88,10 @@ void calibrate(PositionSensor *ps, GPIOStruct *gpio, ControllerStruct *controlle
     int raw_b[n] = {0};
     float theta_ref = 0;
     float theta_actual = 0;
-    float v_d = .25;                                                             // Put volts on the D-Axis
-    float v_q = 0.0;
+    float v_d = .15f;                                                             // Put volts on the D-Axis
+    float v_q = 0.0f;
     float v_u, v_v, v_w = 0;
-    float dtc_u, dtc_v, dtc_w = .5;
+    float dtc_u, dtc_v, dtc_w = .5f;
     
         
     ///Set voltage angle to zero, wait for rotor position to settle

@@ -92,9 +92,9 @@ void commutate(ControllerStruct *controller, ObserverStruct *observer, GPIOStruc
        
        float s = FastSin(theta); 
        float c = FastCos(theta);                            
-       //dq0(controller->theta_elec, controller->i_a, controller->i_b, controller->i_c, &controller->i_d, &controller->i_q);    //dq0 transform on currents
-       controller->i_d = 0.6666667f*(c*controller->i_a + (0.86602540378f*s-.5f*c)*controller->i_b + (-0.86602540378f*s-.5f*c)*controller->i_c);   ///Faster DQ0 Transform
-       controller->i_q = 0.6666667f*(-s*controller->i_a - (-0.86602540378f*c-.5f*s)*controller->i_b - (0.86602540378f*c-.5f*s)*controller->i_c);
+       dq0(controller->theta_elec, controller->i_a, controller->i_b, controller->i_c, &controller->i_d, &controller->i_q);    //dq0 transform on currents
+       //controller->i_d = 0.6666667f*(c*controller->i_a + (0.86602540378f*s-.5f*c)*controller->i_b + (-0.86602540378f*s-.5f*c)*controller->i_c);   ///Faster DQ0 Transform
+       //controller->i_q = 0.6666667f*(-s*controller->i_a - (-0.86602540378f*c-.5f*s)*controller->i_b - (0.86602540378f*c-.5f*s)*controller->i_c);
         
         controller->i_q_filt = 0.95f*controller->i_q_filt + 0.05f*controller->i_q;
         observer->i_d_m = controller->i_d;
@@ -136,12 +136,12 @@ void commutate(ControllerStruct *controller, ObserverStruct *observer, GPIOStruc
        //controller->v_d = v_d_ff;
        //controller->v_q = v_q_ff; 
        
-       limit_norm(&controller->v_d, &controller->v_q, 1.0f*controller->v_bus);       // Normalize voltage vector to lie within curcle of radius v_bus
-       //abc(controller->theta_elec, controller->v_d, controller->v_q, &controller->v_u, &controller->v_v, &controller->v_w); //inverse dq0 transform on voltages
+       limit_norm(&controller->v_d, &controller->v_q, OVERMODULATION*controller->v_bus);       // Normalize voltage vector to lie within curcle of radius v_bus
+       abc(controller->theta_elec+0.5f*DT*controller->dtheta_elec, controller->v_d, controller->v_q, &controller->v_u, &controller->v_v, &controller->v_w); //inverse dq0 transform on voltages
     
-        controller->v_u = c*controller->v_d - s*controller->v_q;                // Faster Inverse DQ0 transform
-        controller->v_v = (0.86602540378f*s-.5f*c)*controller->v_d - (-0.86602540378f*c-.5f*s)*controller->v_q;
-        controller->v_w = (-0.86602540378f*s-.5f*c)*controller->v_d - (0.86602540378f*c-.5f*s)*controller->v_q;
+        //controller->v_u = c*controller->v_d - s*controller->v_q;                // Faster Inverse DQ0 transform
+        //controller->v_v = (0.86602540378f*s-.5f*c)*controller->v_d - (-0.86602540378f*c-.5f*s)*controller->v_q;
+        //controller->v_w = (-0.86602540378f*s-.5f*c)*controller->v_d - (0.86602540378f*c-.5f*s)*controller->v_q;
        svm(controller->v_bus, controller->v_u, controller->v_v, controller->v_w, &controller->dtc_u, &controller->dtc_v, &controller->dtc_w); //space vector modulation
 
        observer->i_d_dot = 0.5f*(controller->v_d - 2.0f*(observer->i_d_est*R_PHASE - controller->dtheta_elec*L_Q*observer->i_q_est))/L_D;   //feed-forward voltage
