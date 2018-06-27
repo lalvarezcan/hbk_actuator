@@ -110,3 +110,9 @@ void DRV832x::disable_gd(void)
     uint16_t val = (read_register(DCR)) | (0x1<<2);    
     write_register(DCR, val);
     }
+    
+void DRV832x::calibrate(void)
+{
+    uint16_t val = 0x1<<4 + 0x1<<3 + 0x1<<2;
+    write_register(CSACR, val);
+    }

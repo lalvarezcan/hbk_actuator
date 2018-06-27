@@ -1,5 +1,5 @@
 /// high-bandwidth 3-phase motor control, for robots
-/// Written by benkatz, with much inspiration from bayleyw, nkirkby, scolton, David Otten, and others
+/// Written by benkatz, with much inspiration from Bayley Wang, Nick Kirkby, Shane Colton, David Otten, and others
 /// Hardware documentation can be found at build-its.blogspot.com
 /// Written for the STM32F446, but can be implemented on other STM32 MCU's with some further register-diddling
 
@@ -9,7 +9,7 @@
 #define SETUP_MODE 4
 #define ENCODER_MODE 5
 
-#define VERSION_NUM "1.6"
+#define VERSION_NUM "1.7"
 
 
 float __float_reg[64];                                                          // Floats stored in flash
@@ -41,7 +41,7 @@ ObserverStruct observer;
 Serial pc(PA_2, PA_3);
 
 
-CAN          can(PB_8, PB_9);      // CAN Rx pin name, CAN Tx pin name
+CAN          can(PB_8, PB_9, 1000000);      // CAN Rx pin name, CAN Tx pin name
 CANMessage   rxMsg;
 CANMessage   txMsg;
 
@@ -164,15 +164,16 @@ extern "C" void TIM1_UP_TIM10_IRQHandler(void) {
         ADC1->CR2  |= 0x40000000;                                               // Begin sample and conversion
         //volatile int delay;   
         //for (delay = 0; delay < 55; delay++);
+
+        spi.Sample();                                                           // sample position sensor
         controller.adc2_raw = ADC2->DR;                                         // Read ADC Data Registers
         controller.adc1_raw = ADC1->DR;
         controller.adc3_raw = ADC3->DR;
-        spi.Sample();                                                           // sample position sensor
         controller.theta_elec = spi.GetElecPosition();
         controller.theta_mech = (1.0f/GR)*spi.GetMechPosition();
         controller.dtheta_mech = (1.0f/GR)*spi.GetMechVelocity();  
         controller.dtheta_elec = spi.GetElecVelocity();
-        controller.v_bus = 0.95f*controller.v_bus + 0.05f*((float)controller.adc3_raw)*V_SCALE;
+        controller.v_bus = 24.0f;//0.95f*controller.v_bus + 0.05f*((float)controller.adc3_raw)*V_SCALE;
         ///
         
         /// Check state machine state, and run the appropriate function ///
@@ -213,20 +214,22 @@ extern "C" void TIM1_UP_TIM10_IRQHandler(void) {
                     controller.kd = 0;
                     controller.t_ff = 0;
                     } 
-                //commutate(&controller, &observer, &gpio, controller.theta_elec);           // Run current loop
-                TIM1->CCR3 = (PWM_ARR)*(0.5f);                        // Write duty cycles
-                TIM1->CCR2 = (PWM_ARR)*(0.5f);
-                TIM1->CCR1 = (PWM_ARR)*(0.5f);
+                controller.i_q_ref = 2.0f;
+                commutate(&controller, &observer, &gpio, controller.theta_elec);           // Run current loop
+                //TIM1->CCR3 = (PWM_ARR)*(0.5f);                        // Write duty cycles
+                //TIM1->CCR2 = (PWM_ARR)*(0.5f);
+                //TIM1->CCR1 = (PWM_ARR)*(0.5f);
                 controller.timeout += 1;
                 
                 /*
                 count++;
                 if(count == 4000){
-                     //printf("%.4f\n\r", controller.dtheta_mech);
-                     
+                     printf("%d  %d  %.4f  %.4f  %.4f\n\r", controller.adc1_raw, controller.adc2_raw, controller.i_a, controller.i_b, controller.i_c);
+                     //printf("%.3f\n\r", controller.dtheta_mech);
                      count = 0;
                      }
-                 */    
+                     */
+                   
                      
             
                 }     
@@ -351,7 +354,6 @@ void serial_interrupt(void){
     }
        
 int main() {
-    can.frequency(1000000);                                                     // set bit rate to 1Mbps
     controller.v_bus = V_BUS;
     controller.mode = 0;
     Init_All_HW(&gpio);                                                         // Setup PWM, ADC, GPIO
@@ -359,12 +361,17 @@ int main() {
     
     gpio.enable->write(1);
     wait_us(100);
+    drv.calibrate();
+    wait_us(100);
     drv.write_DCR(0x0, 0x0, 0x0, PWM_MODE_3X, 0x0, 0x0, 0x0, 0x0, 0x1);
     wait_us(100);
     drv.write_CSACR(0x0, 0x1, 0x0, CSA_GAIN_40, 0x0, 0x0, 0x0, 0x0, 0x3);
     wait_us(100);
     
+    
+    //drv.enable_gd();
     zero_current(&controller.adc1_offset, &controller.adc2_offset);             // Measure current sensor zero-offset
+    //drv.disable_gd();
 
 
     
@@ -377,7 +384,6 @@ int main() {
     TIM1->CCR1 = 0x708*(1.0f);
     gpio.enable->write(0);
     */
-
     reset_foc(&controller);                                                     // Reset current controller
     TIM1->CR1 ^= TIM_CR1_UDIS;
     //TIM1->CR1 |= TIM_CR1_UDIS; //enable interrupt
@@ -401,7 +407,8 @@ int main() {
     int lut[128] = {0};
     memcpy(&lut, &ENCODER_LUT, sizeof(lut));
     spi.WriteLUT(lut);                                                          // Set potision sensor nonlinearity lookup table
-    
+    init_controller_params(&controller);
+
     pc.baud(921600);                                                            // set serial baud rate
     wait(.01);
     pc.printf("\n\r\n\r HobbyKing Cheetah\n\r\n\r");
@@ -429,19 +436,5 @@ int main() {
 
     int counter = 0;
     while(1) {
-counter++;
-        if(counter>40000)
-        {   
-            //gpio.enable->write(1);
-            //wait_us(100);
-            //printf(" %d\n\r", drv.read_register(DCR));
-            //wait_us(100);
-            //printf(" %d\n\r", drv.read_register(CSACR));
-            drv.print_faults();
-            //printf("%d\n\r", drv.read_register(DCR));
-            counter = 0;
-            //gpio.enable->write(0);
-            }
-        wait_us(25);
     }
 }

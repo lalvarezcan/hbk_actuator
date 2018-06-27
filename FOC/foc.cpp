@@ -56,6 +56,15 @@ void zero_current(int *offset_1, int *offset_2){                                
     *offset_1 = adc1_offset/n;
     *offset_2 = adc2_offset/n;
     }
+    
+void init_controller_params(ControllerStruct *controller){
+    controller->ki_d = KI_D;
+    controller->ki_q = KI_Q;
+    controller->k_d = K_SCALE*I_BW;
+    controller->k_q = K_SCALE*I_BW;
+    controller->alpha = 1.0f - 1.0f/(1.0f - DT*I_BW*2.0f*PI);
+    
+    }
 
 void reset_foc(ControllerStruct *controller){
     TIM1->CCR3 = (PWM_ARR>>1)*(0.5f);
@@ -70,6 +79,12 @@ void reset_foc(ControllerStruct *controller){
     controller->d_int = 0;
     controller->v_q = 0;
     controller->v_d = 0;
+    }
+    
+void limit_current_ref (ControllerStruct *controller){
+    float i_q_max_limit = (0.5774f*controller->v_bus - controller->dtheta_elec*WB)/R_PHASE;
+    float i_q_min_limit = (-0.5774f*controller->v_bus - controller->dtheta_elec*WB)/R_PHASE;
+    controller->i_q_ref = fmaxf(fminf(i_q_max_limit, controller->i_q_ref), i_q_min_limit);
     }
 
 
@@ -109,44 +124,45 @@ void commutate(ControllerStruct *controller, ObserverStruct *observer, GPIOStruc
         observer->i_q_est += K_O*observer->e_q + .001f*observer->e_q_int;
         
         
-        float scog12 = FastSin(12.0f*theta);
-        float scog1 = s;
-        float cogging_current = 0.25f*scog1 - 0.3f*scog12;
+        //float scog12 = FastSin(12.0f*theta);
+        //float scog1 = s;
+        //float cogging_current = 0.25f*scog1 - 0.3f*scog12;
+        
+        // Filter the current references to the desired closed-loopbandwidth
+        // Allows calculation of desired di/dt for inductance, etc
+        controller->did_dt = controller->i_d_ref_filt;
+        controller->diq_dt = controller->i_q_ref_filt;
+        controller->i_d_ref_filt = (1.0f-controller->alpha)*controller->i_d_ref_filt + controller->alpha*controller->i_d_ref;
+        controller->i_q_ref_filt = (1.0f-controller->alpha)*controller->i_q_ref_filt + controller->alpha*controller->i_q_ref;
+        controller->did_dt = (controller->i_d_ref_filt - controller->did_dt)/DT;
+        controller->diq_dt = (controller->i_q_ref_filt - controller->diq_dt)/DT;
        
        /// PI Controller ///
        float i_d_error = controller->i_d_ref - controller->i_d;
-       float i_q_error = controller->i_q_ref - controller->i_q  + cogging_current;
+       float i_q_error = controller->i_q_ref - controller->i_q;//  + cogging_current;
        
-       float v_d_ff = 2.0f*(controller->i_d_ref*R_PHASE - controller->dtheta_elec*L_Q*controller->i_q_ref);   //feed-forward voltages
-       float v_q_ff =  2.0f*(controller->i_q_ref*R_PHASE  + controller->dtheta_elec*(L_D*controller->i_d_ref + WB));
+       // Calculate feed-forward voltages //
+       float v_d_ff = 2.0f*(controller->i_d_ref*R_PHASE + L_D*controller->did_dt - controller->dtheta_elec*L_Q*controller->i_q_ref);   //feed-forward voltages
+       float v_q_ff =  2.0f*(controller->i_q_ref*R_PHASE + L_Q*controller->diq_dt + controller->dtheta_elec*(L_D*controller->i_d_ref + WB));
        
+       // Integrate Error //
        controller->d_int += i_d_error;   
        controller->q_int += i_q_error;
-       
-       //v_d_ff = 0;
-       //v_q_ff = 0;
-       
-       limit_norm(&controller->d_int, &controller->q_int, V_BUS/(K_SCALE*I_BW*KI_Q));        // Limit integrators to prevent windup
-       controller->v_d = K_SCALE*I_BW*i_d_error + K_SCALE*I_BW*KI_D*controller->d_int;// + v_d_ff;  
-       controller->v_q = K_SCALE*I_BW*i_q_error + K_SCALE*I_BW*KI_Q*controller->q_int;// + v_q_ff; 
-       
-       //controller->v_q = 4.0f;
-       //controller->v_d = 0.0f;
-       
-       //controller->v_d = v_d_ff;
-       //controller->v_q = v_q_ff; 
+
+       limit_norm(&controller->d_int, &controller->q_int, V_BUS/(controller->k_q*controller->ki_q));        
+       controller->v_d = controller->k_d*(i_d_error + controller->ki_d*controller->d_int);// + v_d_ff;  
+       controller->v_q = controller->k_q*(i_q_error + controller->ki_q*controller->q_int);// + v_q_ff; 
        
        limit_norm(&controller->v_d, &controller->v_q, OVERMODULATION*controller->v_bus);       // Normalize voltage vector to lie within curcle of radius v_bus
-       abc(controller->theta_elec+0.5f*DT*controller->dtheta_elec, controller->v_d, controller->v_q, &controller->v_u, &controller->v_v, &controller->v_w); //inverse dq0 transform on voltages
-    
-        //controller->v_u = c*controller->v_d - s*controller->v_q;                // Faster Inverse DQ0 transform
-        //controller->v_v = (0.86602540378f*s-.5f*c)*controller->v_d - (-0.86602540378f*c-.5f*s)*controller->v_q;
-        //controller->v_w = (-0.86602540378f*s-.5f*c)*controller->v_d - (0.86602540378f*c-.5f*s)*controller->v_q;
+       abc(controller->theta_elec, controller->v_d, controller->v_q, &controller->v_u, &controller->v_v, &controller->v_w); //inverse dq0 transform on voltages
        svm(controller->v_bus, controller->v_u, controller->v_v, controller->v_w, &controller->dtc_u, &controller->dtc_v, &controller->dtc_w); //space vector modulation
 
        observer->i_d_dot = 0.5f*(controller->v_d - 2.0f*(observer->i_d_est*R_PHASE - controller->dtheta_elec*L_Q*observer->i_q_est))/L_D;   //feed-forward voltage
        observer->i_q_dot =  0.5f*(controller->v_q - 2.0f*(observer->i_q_est*R_PHASE  + controller->dtheta_elec*(L_D*observer->i_d_est + WB)))/L_Q;
        
+       //controller->dtc_u = 0.5f;
+       //controller->dtc_v = 0.6f;
+       //controller->dtc_w = 0.5f;
        if(PHASE_ORDER){                                                         // Check which phase order to use, 
             TIM1->CCR3 = (PWM_ARR)*(1.0f-controller->dtc_u);                        // Write duty cycles
             TIM1->CCR2 = (PWM_ARR)*(1.0f-controller->dtc_v);
@@ -168,7 +184,7 @@ void commutate(ControllerStruct *controller, ObserverStruct *observer, GPIOStruc
            //printf("%.2f  %.2f  %.2f\n\r", controller->i_a, controller->i_b, controller->i_c);
            //printf("%f\n\r", controller->dtheta_mech*GR);
            //pc.printf("%f    %f    %f\n\r", controller->i_a, controller->i_b, controller->i_c);
-           //pc.printf("%f    %f\n\r", controller->i_d, controller->i_q);
+           //printf("%f    %f\n\r", controller->k_d, controller->k_q);
            //pc.printf("%d    %d\n\r", controller->adc1_raw, controller->adc2_raw);
             }
     }

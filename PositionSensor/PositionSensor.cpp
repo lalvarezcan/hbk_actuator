@@ -25,10 +25,8 @@ PositionSensorAM5147::PositionSensorAM5147(int CPR, float offset, int ppairs){
     }
     
 void PositionSensorAM5147::Sample(){
-    GPIOA->ODR &= ~(1 << 15);
     raw = spi->write(readAngleCmd);
     raw &= 0x3FFF;                                                              //Extract last 14 bits
-    GPIOA->ODR |= (1 << 15);
     int off_1 = offset_lut[raw>>7];
     int off_2 = offset_lut[((raw>>7)+1)%128];
     int off_interp = off_1 + ((off_2 - off_1)*(raw - ((raw>>7)<<7))>>7);        // Interpolate between lookup table entries

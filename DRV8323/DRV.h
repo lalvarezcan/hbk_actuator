@@ -35,6 +35,7 @@ class DRV832x {
         void write_CSACR(int CSA_FET, int VREF_DIV, int LS_REF, int CSA_GAIN, int DIS_SEN, int CSA_CAL_A, int CSA_CAL_B, int CSA_CAL_C, int SEN_LVL);
         void enable_gd(void);
         void disable_gd(void);
+        void calibrate(void);
         void print_faults();
         
     private:
