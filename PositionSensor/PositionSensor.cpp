@@ -1,6 +1,7 @@
 
 #include "mbed.h"
 #include "PositionSensor.h"
+#include "math_ops.h"
 //#include "offset_lut.h"
 //#include <math.h>
 
@@ -25,8 +26,10 @@ PositionSensorAM5147::PositionSensorAM5147(int CPR, float offset, int ppairs){
     }
     
 void PositionSensorAM5147::Sample(){
+    GPIOA->ODR &= ~(1 << 15);
     raw = spi->write(readAngleCmd);
     raw &= 0x3FFF;                                                              //Extract last 14 bits
+    GPIOA->ODR |= (1 << 15);
     int off_1 = offset_lut[raw>>7];
     int off_2 = offset_lut[((raw>>7)+1)%128];
     int off_interp = off_1 + ((off_2 - off_1)*(raw - ((raw>>7)<<7))>>7);        // Interpolate between lookup table entries
@@ -40,20 +43,22 @@ void PositionSensorAM5147::Sample(){
     
     old_counts = angle;
     oldModPosition = modPosition;
-    modPosition = ((6.28318530718f * ((float) angle))/ (float)_CPR);
-    position = (6.28318530718f * ((float) angle+(_CPR*rotations)))/ (float)_CPR;
+    modPosition = ((2.0f*PI * ((float) angle))/ (float)_CPR);
+    position = (2.0f*PI * ((float) angle+(_CPR*rotations)))/ (float)_CPR;
     MechPosition = position - MechOffset;
-    float elec = ((6.28318530718f/(float)_CPR) * (float) ((_ppairs*angle)%_CPR)) + ElecOffset;
-    if(elec < 0) elec += 6.28318530718f;
-    else if(elec > 6.28318530718f) elec -= 6.28318530718f ; 
+    float elec = ((2.0f*PI/(float)_CPR) * (float) ((_ppairs*angle)%_CPR)) + ElecOffset;
+    if(elec < 0) elec += 2.0f*PI;
+    else if(elec > 2.0f*PI) elec -= 2.0f*PI ; 
     ElecPosition = elec;
     
     float vel;
-    if(modPosition<.1f && oldModPosition>6.1f){
-        vel = (modPosition - oldModPosition + 6.28318530718f)*40000.0f;
+    //if(modPosition<.1f && oldModPosition>6.1f){
+    if((modPosition-oldModPosition) < -3.0f){
+        vel = (modPosition - oldModPosition + 2.0f*PI)*40000.0f;
         }
-    else if(modPosition>6.1f && oldModPosition<0.1f){
-        vel = (modPosition - oldModPosition - 6.28318530718f)*40000.0f;
+    //else if(modPosition>6.1f && oldModPosition<0.1f){
+    else if((modPosition - oldModPosition) > 3.0f){
+        vel = (modPosition - oldModPosition - 2.0f*PI)*40000.0f;
         }
     else{
         vel = (modPosition-oldModPosition)*40000.0f;
@@ -66,7 +71,7 @@ void PositionSensorAM5147::Sample(){
         sum += velVec[n-i];
         }
     velVec[0] = vel;
-    MechVelocity =  sum/(float)n;
+    MechVelocity =  sum/((float)n);
     ElecVelocity = MechVelocity*_ppairs;
     ElecVelocityFilt = 0.99f*ElecVelocityFilt + 0.01f*ElecVelocity;
     }

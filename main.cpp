@@ -214,21 +214,24 @@ extern "C" void TIM1_UP_TIM10_IRQHandler(void) {
                     controller.kd = 0;
                     controller.t_ff = 0;
                     } 
-                controller.i_q_ref = 2.0f;
+                //controller.i_q_ref = 2.0f;
+                //controller.i_d_ref = 30.0f;
                 commutate(&controller, &observer, &gpio, controller.theta_elec);           // Run current loop
                 //TIM1->CCR3 = (PWM_ARR)*(0.5f);                        // Write duty cycles
                 //TIM1->CCR2 = (PWM_ARR)*(0.5f);
                 //TIM1->CCR1 = (PWM_ARR)*(0.5f);
                 controller.timeout += 1;
                 
-                /*
+                
                 count++;
+                /*
                 if(count == 4000){
-                     printf("%d  %d  %.4f  %.4f  %.4f\n\r", controller.adc1_raw, controller.adc2_raw, controller.i_a, controller.i_b, controller.i_c);
-                     //printf("%.3f\n\r", controller.dtheta_mech);
+                     //printf("%d  %d  %.4f  %.4f  %.4f\n\r", controller.adc1_raw, controller.adc2_raw, controller.i_a, controller.i_b, controller.i_c);
+                     printf("%.3f\n\r", controller.dtheta_mech);
                      count = 0;
                      }
                      */
+                     
                    
                      
             
@@ -365,9 +368,9 @@ int main() {
     wait_us(100);
     drv.write_DCR(0x0, 0x0, 0x0, PWM_MODE_3X, 0x0, 0x0, 0x0, 0x0, 0x1);
     wait_us(100);
-    drv.write_CSACR(0x0, 0x1, 0x0, CSA_GAIN_40, 0x0, 0x0, 0x0, 0x0, 0x3);
+    drv.write_CSACR(0x0, 0x1, 0x0, CSA_GAIN_40, 0x0, 0x0, 0x0, 0x0, SEN_LVL_1_0);
     wait_us(100);
-    
+    drv.write_OCPCR(TRETRY_4MS, DEADTIME_100NS, OCP_RETRY, OCP_DEG_4US, VDS_LVL_0_75);
     
     //drv.enable_gd();
     zero_current(&controller.adc1_offset, &controller.adc2_offset);             // Measure current sensor zero-offset
@@ -426,7 +429,8 @@ int main() {
     printf(" %d\n\r", drv.read_register(DCR));
     wait_us(100);
     printf(" %d\n\r", drv.read_register(CSACR));
-    
+    wait_us(100);
+    printf(" %d\n\r", drv.read_register(OCPCR));
     drv.disable_gd();
     
     pc.attach(&serial_interrupt);                                               // attach serial interrupt

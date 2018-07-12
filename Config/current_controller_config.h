@@ -8,7 +8,7 @@
 #define KI_D 0.0255f                // PI zero, in radians per sample
 #define KI_Q 0.0255f                // PI zero, in radians per sample
 #define V_BUS 24.0f                 // Volts
-#define OVERMODULATION 1.2f         // 1.0 = no overmodulation
+#define OVERMODULATION 1.4f         // 1.0 = no overmodulation
 
 #define D_INT_LIM V_BUS/(K_D*KI_D)  // Amps*samples
 #define Q_INT_LIM V_BUS/(K_Q*KI_Q)  // Amps*samples

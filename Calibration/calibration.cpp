@@ -75,17 +75,30 @@ void calibrate(PositionSensor *ps, GPIOStruct *gpio, ControllerStruct *controlle
     /// Measures the electrical angle offset of the position sensor
     /// and (in the future) corrects nonlinearity due to position sensor eccentricity
     printf("Starting calibration procedure\n\r");
+    float * error_f;
+    float * error_b;
+    int * lut;
+    int * raw_f;
+    int * raw_b;
+    float * error;
+    float * error_filt;
     
     const int n = 128*NPP;                                                      // number of positions to be sampled per mechanical rotation.  Multiple of NPP for filtering reasons (see later)
     const int n2 = 50;                                                          // increments between saved samples (for smoothing motion)
     float delta = 2*PI*NPP/(n*n2);                                              // change in angle between samples
-    float error_f[n] = {0};                                                     // error vector rotating forwards
-    float error_b[n] = {0};                                                     // error vector rotating backwards
+    error_f = new float[n]();                                                     // error vector rotating forwards
+    error_b = new float[n]();                                                     // error vector rotating backwards
     const int  n_lut = 128;
-    int lut[n_lut]= {0};                                                        // clear any old lookup table before starting.
+    lut = new int[n_lut]();                                                        // clear any old lookup table before starting.
+    
+    error = new float[n]();
+    const int window = 128;
+    error_filt = new float[n]();
+    float cogging_current[window] = {0};
+    
     ps->WriteLUT(lut); 
-    int raw_f[n] = {0};
-    int raw_b[n] = {0};
+    raw_f = new int[n]();
+    raw_b = new int[n]();
     float theta_ref = 0;
     float theta_actual = 0;
     float v_d = .05f;                                                             // Put volts on the D-Axis
@@ -182,10 +195,7 @@ void calibrate(PositionSensor *ps, GPIOStruct *gpio, ControllerStruct *controlle
         /// This filter has zero gain at electrical frequency and all integer multiples
         /// So cogging effects should be completely filtered out.
         
-        float error[n] = {0};
-        const int window = 128;
-        float error_filt[n] = {0};
-        float cogging_current[window] = {0};
+        
         float mean = 0;
         for (int i = 0; i<n; i++){                                              //Average the forward and back directions
             error[i] = 0.5f*(error_f[i] + error_b[n-i-1]);
@@ -209,14 +219,14 @@ void calibrate(PositionSensor *ps, GPIOStruct *gpio, ControllerStruct *controlle
         
         
         printf("\n\r Encoder non-linearity compensation table\n\r");
-        printf(" Sample Number : Lookup Index : Lookup Value : Cogging Current Lookup\n\r\n\r");
+        printf(" Sample Number : Lookup Index : Lookup Value\n\r\n\r");
         for (int i = 0; i<n_lut; i++){                                          // build lookup table
             int ind = (raw_offset>>7) + i;
             if(ind > (n_lut-1)){ 
                 ind -= n_lut;
                 }
             lut[ind] = (int) ((error_filt[i*NPP] - mean)*(float)(ps->GetCPR())/(2.0f*PI));
-            printf("%d   %d   %d   %f\n\r", i, ind, lut[ind],  cogging_current[i]);
+            printf("%d   %d   %d \n\r", i, ind, lut[ind]);
             wait(.001);
             }
             
@@ -228,6 +238,11 @@ void calibrate(PositionSensor *ps, GPIOStruct *gpio, ControllerStruct *controlle
         if (!prefs->ready()) prefs->open();
         prefs->flush();                                                         // write offset and lookup table to flash
         prefs->close();
-
+        
+        delete[] error_f;       //gotta free up that ram
+        delete[] error_b;
+        delete[] lut;
+        delete[] raw_f;
+        delete[] raw_b;
 
     }

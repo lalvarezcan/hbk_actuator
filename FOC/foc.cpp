@@ -142,19 +142,19 @@ void commutate(ControllerStruct *controller, ObserverStruct *observer, GPIOStruc
        float i_q_error = controller->i_q_ref - controller->i_q;//  + cogging_current;
        
        // Calculate feed-forward voltages //
-       float v_d_ff = 2.0f*(controller->i_d_ref*R_PHASE + L_D*controller->did_dt - controller->dtheta_elec*L_Q*controller->i_q_ref);   //feed-forward voltages
-       float v_q_ff =  2.0f*(controller->i_q_ref*R_PHASE + L_Q*controller->diq_dt + controller->dtheta_elec*(L_D*controller->i_d_ref + WB));
+       float v_d_ff = 2.0f*(0.0f*controller->i_d_ref*R_PHASE + 0.0f*L_D*controller->did_dt - controller->dtheta_elec*L_Q*controller->i_q);   //feed-forward voltages
+       float v_q_ff =  2.0f*(0.0f*controller->i_q_ref*R_PHASE + 0.0f*L_Q*controller->diq_dt + controller->dtheta_elec*(L_D*controller->i_d + 0.0f*WB));
        
        // Integrate Error //
        controller->d_int += i_d_error;   
        controller->q_int += i_q_error;
 
        limit_norm(&controller->d_int, &controller->q_int, V_BUS/(controller->k_q*controller->ki_q));        
-       controller->v_d = controller->k_d*(i_d_error + controller->ki_d*controller->d_int);// + v_d_ff;  
-       controller->v_q = controller->k_q*(i_q_error + controller->ki_q*controller->q_int);// + v_q_ff; 
+       controller->v_d = controller->k_d*(i_d_error + controller->ki_d*controller->d_int) + v_d_ff;  
+       controller->v_q = controller->k_q*(i_q_error + controller->ki_q*controller->q_int) + v_q_ff; 
        
        limit_norm(&controller->v_d, &controller->v_q, OVERMODULATION*controller->v_bus);       // Normalize voltage vector to lie within curcle of radius v_bus
-       abc(controller->theta_elec, controller->v_d, controller->v_q, &controller->v_u, &controller->v_v, &controller->v_w); //inverse dq0 transform on voltages
+       abc(controller->theta_elec + 0.5f*DT*controller->dtheta_elec, controller->v_d, controller->v_q, &controller->v_u, &controller->v_v, &controller->v_w); //inverse dq0 transform on voltages
        svm(controller->v_bus, controller->v_u, controller->v_v, controller->v_w, &controller->dtc_u, &controller->dtc_v, &controller->dtc_w); //space vector modulation
 
        observer->i_d_dot = 0.5f*(controller->v_d - 2.0f*(observer->i_d_est*R_PHASE - controller->dtheta_elec*L_Q*observer->i_q_est))/L_D;   //feed-forward voltage
@@ -184,7 +184,7 @@ void commutate(ControllerStruct *controller, ObserverStruct *observer, GPIOStruc
            //printf("%.2f  %.2f  %.2f\n\r", controller->i_a, controller->i_b, controller->i_c);
            //printf("%f\n\r", controller->dtheta_mech*GR);
            //pc.printf("%f    %f    %f\n\r", controller->i_a, controller->i_b, controller->i_c);
-           //printf("%f    %f\n\r", controller->k_d, controller->k_q);
+           printf("%f %f\n\r", v_q_ff, v_d_ff);
            //pc.printf("%d    %d\n\r", controller->adc1_raw, controller->adc2_raw);
             }
     }
