@@ -1,7 +1,6 @@
 #ifndef STRUCTS_H
 #define STRUCTS_H
 
-//#include "CANnucleo.h"
 #include "mbed.h"
 #include "FastPWM.h"
 
@@ -22,7 +21,7 @@ typedef struct{
     float v_bus;                                            // DC link voltage
     float theta_mech, theta_elec;                           // Rotor mechanical and electrical angle
     float dtheta_mech, dtheta_elec, dtheta_elec_filt;       // Rotor mechanical and electrical angular velocit
-    float i_d, i_q, i_q_filt;                               // D/Q currents
+    float i_d, i_q, i_q_filt, i_d_filt;                               // D/Q currents
     float v_d, v_q;                                         // D/Q voltages
     float dtc_u, dtc_v, dtc_w;                              // Terminal duty cycles
     float v_u, v_v, v_w;                                    // Terminal voltages
@@ -36,17 +35,18 @@ typedef struct{
     int mode;
     int ovp_flag;                                           // Over-voltage flag
     float p_des, v_des, kp, kd, t_ff;                       // Desired position, velocity, gians, torque
+    float v_ref, fw_int;                                     // output voltage magnitude, field-weakening integral
     float cogging[128];
     } ControllerStruct;
 
 typedef struct{
-    float theta_m, theta_est;
-    float thetadot_m, thetadot_est;
-    float i_d_m, i_d_est;
-    float i_q_m, i_q_est;
-    float i_d_dot, i_q_dot;
-    float e_d, e_q;
-    float e_d_int, e_q_int;
-    } ObserverStruct;
+    float h;
+    float k;
+    float phi;
+    float cos_integral;
+    float sin_integral;
+    float afc_out;
+    } AFCStruct;
+
     
 #endif

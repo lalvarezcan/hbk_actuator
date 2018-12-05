@@ -1,7 +1,7 @@
 
 #include "mbed.h"
 #include "PositionSensor.h"
-#include "math_ops.h"
+#include "../math_ops.h"
 //#include "offset_lut.h"
 //#include <math.h>
 
@@ -25,10 +25,12 @@ PositionSensorAM5147::PositionSensorAM5147(int CPR, float offset, int ppairs){
     raw = 0;
     }
     
-void PositionSensorAM5147::Sample(){
+void PositionSensorAM5147::Sample(float dt){
     GPIOA->ODR &= ~(1 << 15);
-    raw = spi->write(readAngleCmd);
-    raw &= 0x3FFF;                                                              //Extract last 14 bits
+    //raw = spi->write(readAngleCmd);
+    //raw &= 0x3FFF;   
+    raw = spi->write(0);
+    raw = raw>>1;                                                             //Extract last 14 bits
     GPIOA->ODR |= (1 << 15);
     int off_1 = offset_lut[raw>>7];
     int off_2 = offset_lut[((raw>>7)+1)%128];
@@ -53,15 +55,16 @@ void PositionSensorAM5147::Sample(){
     
     float vel;
     //if(modPosition<.1f && oldModPosition>6.1f){
+
     if((modPosition-oldModPosition) < -3.0f){
-        vel = (modPosition - oldModPosition + 2.0f*PI)*40000.0f;
+        vel = (modPosition - oldModPosition + 2.0f*PI)/dt;
         }
     //else if(modPosition>6.1f && oldModPosition<0.1f){
     else if((modPosition - oldModPosition) > 3.0f){
-        vel = (modPosition - oldModPosition - 2.0f*PI)*40000.0f;
+        vel = (modPosition - oldModPosition - 2.0f*PI)/dt;
         }
     else{
-        vel = (modPosition-oldModPosition)*40000.0f;
+        vel = (modPosition-oldModPosition)/dt;
     }    
     
     int n = 40;
@@ -103,7 +106,7 @@ float PositionSensorAM5147::GetMechVelocity(){
 void PositionSensorAM5147::ZeroPosition(){
     rotations = 0;
     MechOffset = 0;
-    Sample();
+    Sample(.00025f);
     MechOffset = GetMechPosition();
     }
     
@@ -192,7 +195,7 @@ PositionSensorEncoder::PositionSensorEncoder(int CPR, float offset, int ppairs) 
     //ZTest->write(1);
     }
     
-void PositionSensorEncoder::Sample(){
+void PositionSensorEncoder::Sample(float dt){
     
     }
 

@@ -2,6 +2,7 @@
 /// Written by benkatz, with much inspiration from Bayley Wang, Nick Kirkby, Shane Colton, David Otten, and others
 /// Hardware documentation can be found at build-its.blogspot.com
 /// Written for the STM32F446, but can be implemented on other STM32 MCU's with some further register-diddling
+/// Version for the TI DRV8323 Everything Chip
 
 #define REST_MODE 0
 #define CALIBRATION_MODE 1
@@ -37,7 +38,6 @@ PreferenceWriter prefs(6);
 GPIOStruct gpio;
 ControllerStruct controller;
 COMStruct com;
-ObserverStruct observer;
 Serial pc(PA_2, PA_3);
 
 
@@ -59,7 +59,7 @@ volatile int state_change;
 
 void onMsgReceived() {
     //msgAvailable = true;
-    //printf("%.3f   %.3f   %.3f\n\r", controller.theta_mech, controller.dtheta_mech, controller.i_q);
+    printf("%df\n\r", rxMsg.id);
     can.read(rxMsg);  
     if((rxMsg.id == CAN_ID)){
         controller.timeout = 0;
@@ -86,6 +86,7 @@ void onMsgReceived() {
 
 void enter_menu_state(void){
     drv.disable_gd();
+    //gpio.enable->write(0);
     printf("\n\r\n\r\n\r");
     printf(" Commands:\n\r");
     wait_us(10);
@@ -102,7 +103,6 @@ void enter_menu_state(void){
     printf(" esc - Exit to Menu\n\r");
     wait_us(10);
     state_change = 0;
-    //gpio.enable->write(0);
     gpio.led->write(0);
     }
 
@@ -128,6 +128,7 @@ void enter_setup_state(void){
     
 void enter_torque_mode(void){
     drv.enable_gd();
+    //gpio.enable->write(1);
     controller.ovp_flag = 0;
     reset_foc(&controller);                                                     // Tesets integrators, and other control loop parameters
     wait(.001);
@@ -140,6 +141,7 @@ void enter_torque_mode(void){
     
 void calibrate(void){
     drv.enable_gd();
+    //gpio.enable->write(1);
     gpio.led->write(1);                                                    // Turn on status LED
     order_phases(&spi, &gpio, &controller, &prefs);                             // Check phase ordering
     calibrate(&spi, &gpio, &controller, &prefs);                                // Perform calibration procedure
@@ -147,12 +149,14 @@ void calibrate(void){
     wait(.2);
     printf("\n\r Calibration complete.  Press 'esc' to return to menu\n\r");
     drv.disable_gd();
+    //gpio.enable->write(0);
      state_change = 0;
     }
     
 void print_encoder(void){
-    printf(" Mechanical Angle:  %f    Electrical Angle:  %f    Raw:  %d\n\r", spi.GetMechPosition(), spi.GetElecPosition(), spi.GetRawPosition());
-    wait(.05);
+    //printf(" Mechanical Angle:  %f    Electrical Angle:  %f    Raw:  %d\n\r", spi.GetMechPosition(), spi.GetElecPosition(), spi.GetRawPosition());
+    printf("%d\n\r", spi.GetRawPosition());
+    wait(.001);
     }
 
 /// Current Sampling Interrupt ///
@@ -165,7 +169,7 @@ extern "C" void TIM1_UP_TIM10_IRQHandler(void) {
         //volatile int delay;   
         //for (delay = 0; delay < 55; delay++);
 
-        spi.Sample();                                                           // sample position sensor
+        spi.Sample(DT);                                                           // sample position sensor
         controller.adc2_raw = ADC2->DR;                                         // Read ADC Data Registers
         controller.adc1_raw = ADC1->DR;
         controller.adc3_raw = ADC3->DR;
@@ -173,7 +177,7 @@ extern "C" void TIM1_UP_TIM10_IRQHandler(void) {
         controller.theta_mech = (1.0f/GR)*spi.GetMechPosition();
         controller.dtheta_mech = (1.0f/GR)*spi.GetMechVelocity();  
         controller.dtheta_elec = spi.GetElecVelocity();
-        controller.v_bus = 24.0f;//0.95f*controller.v_bus + 0.05f*((float)controller.adc3_raw)*V_SCALE;
+        controller.v_bus = V_BUS;//b0.95f*controller.v_bus + 0.05f*((float)controller.adc3_raw)*V_SCALE;
         ///
         
         /// Check state machine state, and run the appropriate function ///
@@ -198,7 +202,8 @@ extern "C" void TIM1_UP_TIM10_IRQHandler(void) {
                 else{
                 /*
                 if(controller.v_bus>28.0f){         //Turn of gate drive if bus voltage is too high, to prevent FETsplosion if the bus is cut during regen
-                    gpio.enable->write(0);
+                    gpio.
+                    ->write(0);
                     controller.ovp_flag = 1;
                     state = REST_MODE;
                     state_change = 1;
@@ -206,7 +211,7 @@ extern "C" void TIM1_UP_TIM10_IRQHandler(void) {
                     }
                     */  
 
-                torque_control(&controller);    
+                //torque_control(&controller);    
                 if((controller.timeout > CAN_TIMEOUT) && (CAN_TIMEOUT > 0)){
                     controller.i_d_ref = 0;
                     controller.i_q_ref = 0;
@@ -214,23 +219,45 @@ extern "C" void TIM1_UP_TIM10_IRQHandler(void) {
                     controller.kd = 0;
                     controller.t_ff = 0;
                     } 
+                //controller.i_q_ref = 0.0f;
+                //controller.i_d_ref = 0.0f;
+                
                 //controller.i_q_ref = 2.0f;
-                //controller.i_d_ref = 30.0f;
-                commutate(&controller, &observer, &gpio, controller.theta_elec);           // Run current loop
+                //controller.i_d_ref = -30.0f;
+                //controller.kd = .1;
+                //controller.v_des = 25;
+                torque_control(&controller);
+                //controller.i_q_ref = 2.0f;
+                //controller.i_d_ref = -20.0f;
+                commutate(&controller, &gpio, controller.theta_elec);           // Run current loop
                 //TIM1->CCR3 = (PWM_ARR)*(0.5f);                        // Write duty cycles
                 //TIM1->CCR2 = (PWM_ARR)*(0.5f);
                 //TIM1->CCR1 = (PWM_ARR)*(0.5f);
                 controller.timeout += 1;
+
+                //pc.putc(iq);
+                //pc.putc(id);
+                //pc.putc(ang);
+                //pc.printf("\n\r");
                 
                 
                 count++;
+                
                 /*
-                if(count == 4000){
+                if(count == 400){
                      //printf("%d  %d  %.4f  %.4f  %.4f\n\r", controller.adc1_raw, controller.adc2_raw, controller.i_a, controller.i_b, controller.i_c);
-                     printf("%.3f\n\r", controller.dtheta_mech);
+                     printf("%.2f\n\r", 1000.0f*controller.h1_iq_afc_int1);
+                     //pc.putc(id);
+                     //pc.putc(iq);
+                     //pc.putc(ang);
+                     //pc.putc('\n');
+                     //pc.putc('\r');
+                     //printf("%.1f\n", controller.k_q*controller.ki_q*controller.q_int);
                      count = 0;
                      }
                      */
+                     
+                    
                      
                    
                      
@@ -288,7 +315,7 @@ void serial_interrupt(void){
                     break;
                 case 'z':
                     spi.SetMechOffset(0);
-                    spi.Sample();
+                    spi.Sample(DT);
                     wait_us(20);
                     M_OFFSET = spi.GetMechPosition();
                     if (!prefs.ready()) prefs.open();
@@ -370,11 +397,11 @@ int main() {
     wait_us(100);
     drv.write_CSACR(0x0, 0x1, 0x0, CSA_GAIN_40, 0x0, 0x0, 0x0, 0x0, SEN_LVL_1_0);
     wait_us(100);
-    drv.write_OCPCR(TRETRY_4MS, DEADTIME_100NS, OCP_RETRY, OCP_DEG_4US, VDS_LVL_0_75);
+    drv.write_OCPCR(TRETRY_4MS, DEADTIME_200NS, OCP_RETRY, OCP_DEG_4US, VDS_LVL_1_5);
     
     //drv.enable_gd();
     zero_current(&controller.adc1_offset, &controller.adc2_offset);             // Measure current sensor zero-offset
-    //drv.disable_gd();
+    drv.disable_gd();
 
 
     
@@ -426,12 +453,12 @@ int main() {
 
 
 
-    printf(" %d\n\r", drv.read_register(DCR));
-    wait_us(100);
-    printf(" %d\n\r", drv.read_register(CSACR));
-    wait_us(100);
-    printf(" %d\n\r", drv.read_register(OCPCR));
-    drv.disable_gd();
+    //printf(" %d\n\r", drv.read_register(DCR));
+    //wait_us(100);
+    //printf(" %d\n\r", drv.read_register(CSACR));
+    //wait_us(100);
+    //printf(" %d\n\r", drv.read_register(OCPCR));
+    //drv.disable_gd();
     
     pc.attach(&serial_interrupt);                                               // attach serial interrupt
     
@@ -440,5 +467,13 @@ int main() {
 
     int counter = 0;
     while(1) {
+        drv.print_faults();
+       wait(.1);
+        if(state == MOTOR_MODE)
+        {
+            //printf("%.3f\n\r", controller.dtheta_mech);
+            //wait(.001);
+        }
+
     }
 }

@@ -16,7 +16,7 @@ void order_phases(PositionSensor *ps, GPIOStruct *gpio, ControllerStruct *contro
     printf("\n\r Checking phase ordering\n\r");
     float theta_ref = 0;
     float theta_actual = 0;
-    float v_d = .05f;                                                             //Put all volts on the D-Axis
+    float v_d = V_CAL;                                                             //Put all volts on the D-Axis
     float v_q = 0.0f;
     float v_u, v_v, v_w = 0;
     float dtc_u, dtc_v, dtc_w = .5f;
@@ -32,7 +32,7 @@ void order_phases(PositionSensor *ps, GPIOStruct *gpio, ControllerStruct *contro
         wait_us(100);
         }
     //ps->ZeroPosition();
-    ps->Sample(); 
+    ps->Sample(DT); 
     wait_us(1000);
     //float theta_start = ps->GetMechPositionFixed();                                  //get initial rotor position
     float theta_start;
@@ -51,7 +51,7 @@ void order_phases(PositionSensor *ps, GPIOStruct *gpio, ControllerStruct *contro
         TIM1->CCR3 = (PWM_ARR>>1)*(1.0f-dtc_u);                                        //Set duty cycles
         TIM1->CCR2 = (PWM_ARR>>1)*(1.0f-dtc_v);
         TIM1->CCR1 = (PWM_ARR>>1)*(1.0f-dtc_w);
-       ps->Sample();                                                            //sample position sensor
+       ps->Sample(DT);                                                            //sample position sensor
        theta_actual = ps->GetMechPositionFixed();
        if(theta_ref==0){theta_start = theta_actual;}
        if(sample_counter > 200){
@@ -84,7 +84,7 @@ void calibrate(PositionSensor *ps, GPIOStruct *gpio, ControllerStruct *controlle
     float * error_filt;
     
     const int n = 128*NPP;                                                      // number of positions to be sampled per mechanical rotation.  Multiple of NPP for filtering reasons (see later)
-    const int n2 = 50;                                                          // increments between saved samples (for smoothing motion)
+    const int n2 = 40;                                                          // increments between saved samples (for smoothing motion)
     float delta = 2*PI*NPP/(n*n2);                                              // change in angle between samples
     error_f = new float[n]();                                                     // error vector rotating forwards
     error_b = new float[n]();                                                     // error vector rotating backwards
@@ -101,7 +101,7 @@ void calibrate(PositionSensor *ps, GPIOStruct *gpio, ControllerStruct *controlle
     raw_b = new int[n]();
     float theta_ref = 0;
     float theta_actual = 0;
-    float v_d = .05f;                                                             // Put volts on the D-Axis
+    float v_d = V_CAL;                                                             // Put volts on the D-Axis
     float v_q = 0.0f;
     float v_u, v_v, v_w = 0;
     float dtc_u, dtc_v, dtc_w = .5f;
@@ -122,7 +122,7 @@ void calibrate(PositionSensor *ps, GPIOStruct *gpio, ControllerStruct *controlle
             }
         wait_us(100);
         }
-    ps->Sample();   
+    ps->Sample(DT);   
     controller->i_b = I_SCALE*(float)(controller->adc2_raw - controller->adc2_offset);    //Calculate phase currents from ADC readings
     controller->i_c = I_SCALE*(float)(controller->adc1_raw - controller->adc1_offset);
     controller->i_a = -controller->i_b - controller->i_c;
@@ -144,9 +144,9 @@ void calibrate(PositionSensor *ps, GPIOStruct *gpio, ControllerStruct *controlle
             TIM1->CCR2 = (PWM_ARR>>1)*(1.0f-dtc_w);
             }
             wait_us(100);
-            ps->Sample();
+            ps->Sample(DT);
         }
-       ps->Sample();
+       ps->Sample(DT);
        theta_actual = ps->GetMechPositionFixed();
        error_f[i] = theta_ref/NPP - theta_actual;
        raw_f[i] = ps->GetRawPosition();
@@ -169,9 +169,9 @@ void calibrate(PositionSensor *ps, GPIOStruct *gpio, ControllerStruct *controlle
             TIM1->CCR2 = (PWM_ARR>>1)*(1.0f-dtc_w);
             }
             wait_us(100);
-            ps->Sample();
+            ps->Sample(DT);
         }
-       ps->Sample();                                                            // sample position sensor
+       ps->Sample(DT);                                                            // sample position sensor
        theta_actual = ps->GetMechPositionFixed();                                    // get mechanical position
        error_b[i] = theta_ref/NPP - theta_actual;
        raw_b[i] = ps->GetRawPosition();
