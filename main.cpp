@@ -37,6 +37,7 @@ PreferenceWriter prefs(6);
 
 GPIOStruct gpio;
 ControllerStruct controller;
+ObserverStruct observer;
 COMStruct com;
 Serial pc(PA_2, PA_3);
 
@@ -154,8 +155,8 @@ void calibrate(void){
     }
     
 void print_encoder(void){
-    //printf(" Mechanical Angle:  %f    Electrical Angle:  %f    Raw:  %d\n\r", spi.GetMechPosition(), spi.GetElecPosition(), spi.GetRawPosition());
-    printf("%d\n\r", spi.GetRawPosition());
+    printf(" Mechanical Angle:  %f    Electrical Angle:  %f    Raw:  %d\n\r", spi.GetMechPosition(), spi.GetElecPosition(), spi.GetRawPosition());
+    //printf("%d\n\r", spi.GetRawPosition());
     wait(.001);
     }
 
@@ -177,7 +178,7 @@ extern "C" void TIM1_UP_TIM10_IRQHandler(void) {
         controller.theta_mech = (1.0f/GR)*spi.GetMechPosition();
         controller.dtheta_mech = (1.0f/GR)*spi.GetMechVelocity();  
         controller.dtheta_elec = spi.GetElecVelocity();
-        controller.v_bus = V_BUS;//b0.95f*controller.v_bus + 0.05f*((float)controller.adc3_raw)*V_SCALE;
+        controller.v_bus = 0.95f*controller.v_bus + 0.05f*((float)controller.adc3_raw)*V_SCALE;
         ///
         
         /// Check state machine state, and run the appropriate function ///
@@ -224,16 +225,24 @@ extern "C" void TIM1_UP_TIM10_IRQHandler(void) {
                 
                 //controller.i_q_ref = 2.0f;
                 //controller.i_d_ref = -30.0f;
-                //controller.kd = .1;
+                //controller.kp = 1;
+                //controller.kd = .1f;
                 //controller.v_des = 25;
-                torque_control(&controller);
-                //controller.i_q_ref = 2.0f;
-                //controller.i_d_ref = -20.0f;
-                commutate(&controller, &gpio, controller.theta_elec);           // Run current loop
+                //torque_control(&controller);
+                controller.i_q_ref = 40.0f;
+                //
+                //controller.i_q_ref += .00025f;
+                //if(count>80000)
+                //{
+                //    controller.i_q_ref = 0.0f;
+                //    count = 0;
+                //    }    
+                //controller.i_d_ref = -10.0f;
+                commutate(&controller, &observer, &gpio, controller.theta_elec);           // Run current loop
                 //TIM1->CCR3 = (PWM_ARR)*(0.5f);                        // Write duty cycles
                 //TIM1->CCR2 = (PWM_ARR)*(0.5f);
                 //TIM1->CCR1 = (PWM_ARR)*(0.5f);
-                controller.timeout += 1;
+                controller.timeout++;
 
                 //pc.putc(iq);
                 //pc.putc(id);
@@ -244,15 +253,21 @@ extern "C" void TIM1_UP_TIM10_IRQHandler(void) {
                 count++;
                 
                 /*
-                if(count == 400){
+                if(count == 10000){
                      //printf("%d  %d  %.4f  %.4f  %.4f\n\r", controller.adc1_raw, controller.adc2_raw, controller.i_a, controller.i_b, controller.i_c);
-                     printf("%.2f\n\r", 1000.0f*controller.h1_iq_afc_int1);
+                     //printf("%.2f\n\r", 1000.0f*controller.h1_iq_afc_int1);
                      //pc.putc(id);
                      //pc.putc(iq);
                      //pc.putc(ang);
                      //pc.putc('\n');
                      //pc.putc('\r');
                      //printf("%.1f\n", controller.k_q*controller.ki_q*controller.q_int);
+                     if(controller.i_d_ref< 10.0f)
+                     {
+                        controller.i_d_ref += .05f;
+                    }
+                    else{controller.i_d_ref = 0;}
+                    
                      count = 0;
                      }
                      */
@@ -415,6 +430,7 @@ int main() {
     gpio.enable->write(0);
     */
     reset_foc(&controller);                                                     // Reset current controller
+    reset_observer(&observer);                                                 // Reset observer
     TIM1->CR1 ^= TIM_CR1_UDIS;
     //TIM1->CR1 |= TIM_CR1_UDIS; //enable interrupt
     
@@ -429,9 +445,15 @@ int main() {
     rxMsg.len = 8;
     can.attach(&onMsgReceived);                                     // attach 'CAN receive-complete' interrupt handler    
     
+    // If preferences haven't been user configured yet, set defaults 
     prefs.load();                                                               // Read flash
     if(isnan(E_OFFSET)){E_OFFSET = 0.0f;}
     if(isnan(M_OFFSET)){M_OFFSET = 0.0f;}
+    if(isnan(I_BW) || I_BW==-1){I_BW = 1000;}
+    if(isnan(TORQUE_LIMIT) || TORQUE_LIMIT ==-1){TORQUE_LIMIT=18;}
+    if(isnan(CAN_ID) || CAN_ID==-1){CAN_ID = 1;}
+    if(isnan(CAN_MASTER) || CAN_MASTER==-1){CAN_MASTER = 0;}
+    if(isnan(CAN_TIMEOUT) || CAN_TIMEOUT==-1){CAN_TIMEOUT = 0;}
     spi.SetElecOffset(E_OFFSET);                                                // Set position sensor offset
     spi.SetMechOffset(M_OFFSET);
     int lut[128] = {0};
@@ -463,16 +485,27 @@ int main() {
     pc.attach(&serial_interrupt);                                               // attach serial interrupt
     
     state_change = 1;
-    
+    /*
+    for(int i = 0; i< 1000; i++){
+        float dtc_in = .001f*(float)i;
+        printf("%f  ", dtc_in);
+        linearize_dtc(&dtc_in);
+        printf("%f\n\r", dtc_in);
+        wait(.001);
+        }
+    */
 
     int counter = 0;
     while(1) {
         drv.print_faults();
-       wait(.1);
+       wait(.001);
+       //printf("%.4f\n\r", controller.v_bus);
         if(state == MOTOR_MODE)
         {
-            //printf("%.3f\n\r", controller.dtheta_mech);
-            //wait(.001);
+            //printf("%.3f  %.3f  %.3f\n\r", (float)observer.temperature, (float)observer.temperature2, observer.resistance);
+            //printf("%.3f  %.3f  %.3f\n\r", controller.v_q/controller.v_bus, controller.i_q, observer.resistance);
+            printf("%.3f\n\r", controller.dtheta_mech);
+            wait(.001);
         }
 
     }

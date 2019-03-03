@@ -2,6 +2,7 @@
 #define MATH_OPS_H
 
 #define PI 3.14159265359f
+#define SQRT3 1.73205080757f
 
 #include "math.h"
 

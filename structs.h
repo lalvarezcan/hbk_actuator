@@ -29,7 +29,6 @@ typedef struct{
     float d_int, q_int;                                     // Current error integrals
     int adc1_offset, adc2_offset;                           // ADC offsets
     float i_d_ref, i_q_ref, i_d_ref_filt, i_q_ref_filt;     // Current references
-    float did_dt, diq_dt;                                   // Current reference derivatives
     int loop_count;                                         // Degubbing counter
     int timeout;                                            // Watchdog counter
     int mode;
@@ -40,13 +39,8 @@ typedef struct{
     } ControllerStruct;
 
 typedef struct{
-    float h;
-    float k;
-    float phi;
-    float cos_integral;
-    float sin_integral;
-    float afc_out;
-    } AFCStruct;
-
-    
+    double temperature;                                              // Estimated temperature
+    double temperature2;
+    float resistance;
+    }   ObserverStruct;
 #endif
