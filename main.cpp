@@ -10,7 +10,7 @@
 #define SETUP_MODE 4
 #define ENCODER_MODE 5
 
-#define VERSION_NUM "1.7"
+#define VERSION_NUM "1.8"
 
 
 float __float_reg[64];                                                          // Floats stored in flash
@@ -134,7 +134,7 @@ void enter_torque_mode(void){
     reset_foc(&controller);                                                     // Tesets integrators, and other control loop parameters
     wait(.001);
     controller.i_d_ref = 0;
-    controller.i_q_ref = 40;                                                     // Current Setpoints
+    controller.i_q_ref = 0;                                                     // Current Setpoints
     gpio.led->write(1);                                                     // Turn on status LED
     state_change = 0;
     printf("\n\r Entering Motor Mode \n\r");
@@ -212,7 +212,6 @@ extern "C" void TIM1_UP_TIM10_IRQHandler(void) {
                     }
                     */  
 
-                //torque_control(&controller);    
                 if((controller.timeout > CAN_TIMEOUT) && (CAN_TIMEOUT > 0)){
                     controller.i_d_ref = 0;
                     controller.i_q_ref = 0;
@@ -221,14 +220,7 @@ extern "C" void TIM1_UP_TIM10_IRQHandler(void) {
                     controller.t_ff = 0;
                     } 
 
-                //torque_control(&controller);
-                //controller.i_q_ref = 20.0f;
-                if(count > 40000)
-                {
-                    count = 0;
-                    controller.i_q_ref = -controller.i_q_ref;
-                }
-
+                torque_control(&controller);
                 commutate(&controller, &observer, &gpio, controller.theta_elec);           // Run current loop
 
                 controller.timeout++;
@@ -449,21 +441,14 @@ int main() {
     pc.attach(&serial_interrupt);                                               // attach serial interrupt
     
     state_change = 1;
-    /*
-    for(int i = 0; i< 1000; i++){
-        float dtc_in = .001f*(float)i;
-        printf("%f  ", dtc_in);
-        linearize_dtc(&dtc_in);
-        printf("%f\n\r", dtc_in);
-        wait(.001);
-        }
-    */
+
 
     int counter = 0;
     while(1) {
         drv.print_faults();
-       wait(.001);
+       wait(.1);
        //printf("%.4f\n\r", controller.v_bus);
+       /*
         if(state == MOTOR_MODE)
         {
             //printf("%.3f  %.3f  %.3f\n\r", (float)observer.temperature, (float)observer.temperature2, observer.resistance);
@@ -471,6 +456,7 @@ int main() {
             //printf("%.3f\n\r", controller.dtheta_mech);
             wait(.002);
         }
+        */
 
     }
 }
