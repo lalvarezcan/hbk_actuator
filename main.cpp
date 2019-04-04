@@ -134,7 +134,7 @@ void enter_torque_mode(void){
     reset_foc(&controller);                                                     // Tesets integrators, and other control loop parameters
     wait(.001);
     controller.i_d_ref = 0;
-    controller.i_q_ref = 0;                                                     // Current Setpoints
+    controller.i_q_ref = 40;                                                     // Current Setpoints
     gpio.led->write(1);                                                     // Turn on status LED
     state_change = 0;
     printf("\n\r Entering Motor Mode \n\r");
@@ -220,62 +220,19 @@ extern "C" void TIM1_UP_TIM10_IRQHandler(void) {
                     controller.kd = 0;
                     controller.t_ff = 0;
                     } 
-                //controller.i_q_ref = 0.0f;
-                //controller.i_d_ref = 0.0f;
-                
-                //controller.i_q_ref = 2.0f;
-                //controller.i_d_ref = -30.0f;
-                //controller.kp = 1;
-                //controller.kd = .1f;
-                //controller.v_des = 25;
-                //torque_control(&controller);
-                controller.i_q_ref = 40.0f;
-                //
-                //controller.i_q_ref += .00025f;
-                //if(count>80000)
-                //{
-                //    controller.i_q_ref = 0.0f;
-                //    count = 0;
-                //    }    
-                //controller.i_d_ref = -10.0f;
-                commutate(&controller, &observer, &gpio, controller.theta_elec);           // Run current loop
-                //TIM1->CCR3 = (PWM_ARR)*(0.5f);                        // Write duty cycles
-                //TIM1->CCR2 = (PWM_ARR)*(0.5f);
-                //TIM1->CCR1 = (PWM_ARR)*(0.5f);
-                controller.timeout++;
 
-                //pc.putc(iq);
-                //pc.putc(id);
-                //pc.putc(ang);
-                //pc.printf("\n\r");
-                
-                
-                count++;
-                
-                /*
-                if(count == 10000){
-                     //printf("%d  %d  %.4f  %.4f  %.4f\n\r", controller.adc1_raw, controller.adc2_raw, controller.i_a, controller.i_b, controller.i_c);
-                     //printf("%.2f\n\r", 1000.0f*controller.h1_iq_afc_int1);
-                     //pc.putc(id);
-                     //pc.putc(iq);
-                     //pc.putc(ang);
-                     //pc.putc('\n');
-                     //pc.putc('\r');
-                     //printf("%.1f\n", controller.k_q*controller.ki_q*controller.q_int);
-                     if(controller.i_d_ref< 10.0f)
-                     {
-                        controller.i_d_ref += .05f;
-                    }
-                    else{controller.i_d_ref = 0;}
-                    
-                     count = 0;
-                     }
-                     */
-                     
-                    
-                     
-                   
-                     
+                //torque_control(&controller);
+                //controller.i_q_ref = 20.0f;
+                if(count > 40000)
+                {
+                    count = 0;
+                    controller.i_q_ref = -controller.i_q_ref;
+                }
+
+                commutate(&controller, &observer, &gpio, controller.theta_elec);           // Run current loop
+
+                controller.timeout++;
+                count++; 
             
                 }     
                 break;
@@ -394,6 +351,13 @@ void serial_interrupt(void){
                     break;
                     }
             }
+        else if (state == MOTOR_MODE){
+            switch (c){
+                case 'd':
+                    controller.i_q_ref = 0;
+                    controller.i_d_ref = 0;
+                }
+            }
             
         }
     }
@@ -412,7 +376,7 @@ int main() {
     wait_us(100);
     drv.write_CSACR(0x0, 0x1, 0x0, CSA_GAIN_40, 0x0, 0x0, 0x0, 0x0, SEN_LVL_1_0);
     wait_us(100);
-    drv.write_OCPCR(TRETRY_4MS, DEADTIME_200NS, OCP_RETRY, OCP_DEG_4US, VDS_LVL_1_5);
+    drv.write_OCPCR(TRETRY_4MS, DEADTIME_200NS, OCP_RETRY, OCP_DEG_8US, VDS_LVL_1_88);
     
     //drv.enable_gd();
     zero_current(&controller.adc1_offset, &controller.adc2_offset);             // Measure current sensor zero-offset
@@ -503,9 +467,9 @@ int main() {
         if(state == MOTOR_MODE)
         {
             //printf("%.3f  %.3f  %.3f\n\r", (float)observer.temperature, (float)observer.temperature2, observer.resistance);
-            //printf("%.3f  %.3f  %.3f\n\r", controller.v_q/controller.v_bus, controller.i_q, observer.resistance);
-            printf("%.3f\n\r", controller.dtheta_mech);
-            wait(.001);
+            //printf("%.3f  %.3f  %.3f %.3f %.3f\n\r", controller.v_d, controller.v_q, controller.i_d_filt, controller.i_q_filt, controller.dtheta_elec);
+            //printf("%.3f\n\r", controller.dtheta_mech);
+            wait(.002);
         }
 
     }

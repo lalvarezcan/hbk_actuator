@@ -122,12 +122,12 @@ void commutate(ControllerStruct *controller, ObserverStruct *observer, GPIOStruc
         // Resistance observer //
         // Temperature Observer //
         float t_rise = (float)observer->temperature - 25.0f;
-        float q_th_in = (1.0f + .00393f*t_rise)*(controller->i_d*controller->i_d*R_PHASE*1.5f + controller->i_q*controller->i_q*R_PHASE*1.5f);
+        float q_th_in = (1.0f + .00393f*t_rise)*(controller->i_d*controller->i_d*R_PHASE*SQRT3 + controller->i_q*controller->i_q*R_PHASE*SQRT3);
         float q_th_out = t_rise*R_TH;
         observer->temperature += INV_M_TH*DT*(q_th_in-q_th_out);
         
-        //observer->resistance = (controller->v_q - 2.0f*controller->dtheta_elec*(WB + L_D*controller->i_d))/controller->i_q;
-        observer->resistance = controller->v_q/controller->i_q;
+        observer->resistance = (controller->v_q - SQRT3*controller->dtheta_elec*(WB))/controller->i_q;
+        //observer->resistance = controller->v_q/controller->i_q;
         if(isnan(observer->resistance)){observer->resistance = R_PHASE;}
         observer->temperature2 = (double)(25.0f + ((observer->resistance*6.0606f)-1.0f)*275.5f);
         double e = observer->temperature - observer->temperature2;
@@ -157,7 +157,7 @@ void commutate(ControllerStruct *controller, ObserverStruct *observer, GPIOStruc
         controller->i_d_filt = 0.95f*controller->i_d_filt + 0.05f*controller->i_d;
         
         
-        // Filter the current references to the desired closed-loopbandwidth
+        // Filter the current references to the desired closed-loop bandwidth
         controller->i_d_ref_filt = (1.0f-controller->alpha)*controller->i_d_ref_filt + controller->alpha*controller->i_d_ref;
         controller->i_q_ref_filt = (1.0f-controller->alpha)*controller->i_q_ref_filt + controller->alpha*controller->i_q_ref;
 
