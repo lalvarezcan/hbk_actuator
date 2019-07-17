@@ -165,7 +165,7 @@ void commutate(ControllerStruct *controller, ObserverStruct *observer, GPIOStruc
        /// Field Weakening ///
        
        controller->fw_int += .001f*(0.5f*OVERMODULATION*controller->v_bus - controller->v_ref);
-       controller->fw_int = fmaxf(fminf(controller->fw_int, 0.0f), -I_MAX_FW);
+       controller->fw_int = fmaxf(fminf(controller->fw_int, 0.0f), -I_FW_MAX);
        controller->i_d_ref = controller->fw_int;
        //float i_cmd_mag_sq = controller->i_d_ref*controller->i_d_ref + controller->i_q_ref*controller->i_q_ref;
        limit_norm(&controller->i_d_ref, &controller->i_q_ref, I_MAX);

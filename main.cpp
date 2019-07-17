@@ -10,7 +10,7 @@
 #define SETUP_MODE 4
 #define ENCODER_MODE 5
 
-#define VERSION_NUM "1.8"
+#define VERSION_NUM "1.9"
 
 
 float __float_reg[64];                                                          // Floats stored in flash
@@ -110,7 +110,7 @@ void enter_menu_state(void){
 void enter_setup_state(void){
     printf("\n\r\n\r Configuration Options \n\r\n\n");
     wait_us(10);
-    printf(" %-4s %-31s %-5s %-6s %-5s\n\r\n\r", "prefix", "parameter", "min", "max", "current value");
+    printf(" %-4s %-31s %-5s %-6s %-2s\n\r\n\r", "prefix", "parameter", "min", "max", "current value");
     wait_us(10);
     printf(" %-4s %-31s %-5s %-6s %.1f\n\r", "b", "Current Bandwidth (Hz)", "100", "2000", I_BW);
     wait_us(10);
@@ -118,7 +118,9 @@ void enter_setup_state(void){
     wait_us(10);
     printf(" %-4s %-31s %-5s %-6s %-5i\n\r", "m", "CAN Master ID", "0", "127", CAN_MASTER);
     wait_us(10);
-    printf(" %-4s %-31s %-5s %-6s %.1f\n\r", "l", "Torque Limit (N-m)", "0.0", "18.0", TORQUE_LIMIT);
+    printf(" %-4s %-31s %-5s %-6s %.1f\n\r", "l", "Current Limit (A)", "0.0", "40.0", I_MAX);
+    wait_us(10);
+    printf(" %-4s %-31s %-5s %-6s %.1f\n\r", "f", "FW Current Limit (A)", "0.0", "33.0", I_FW_MAX);
     wait_us(10);
     printf(" %-4s %-31s %-5s %-6s %d\n\r", "t", "CAN Timeout (cycles)(0 = none)", "0", "100000", CAN_TIMEOUT);
     wait_us(10);
@@ -178,7 +180,7 @@ extern "C" void TIM1_UP_TIM10_IRQHandler(void) {
         controller.theta_mech = (1.0f/GR)*spi.GetMechPosition();
         controller.dtheta_mech = (1.0f/GR)*spi.GetMechVelocity();  
         controller.dtheta_elec = spi.GetElecVelocity();
-        controller.v_bus = 0.95f*controller.v_bus + 0.05f*((float)controller.adc3_raw)*V_SCALE;
+        controller.v_bus = 0.95f*controller.v_bus + 0.05f*((float)controller.adc3_raw)*V_SCALE; //filter the dc link voltage measurement
         ///
         
         /// Check state machine state, and run the appropriate function ///
@@ -306,7 +308,10 @@ void serial_interrupt(void){
                         CAN_MASTER = atoi(cmd_val);
                         break;
                     case 'l':
-                        TORQUE_LIMIT = fmaxf(fminf(atof(cmd_val), 18.0f), 0.0f);
+                        I_MAX = fmaxf(fminf(atof(cmd_val), 40.0f), 0.0f);
+                        break;
+                    case 'f':
+                        I_FW_MAX = fmaxf(fminf(atof(cmd_val), 33.0f), 0.0f);
                         break;
                     case 't':
                         CAN_TIMEOUT = atoi(cmd_val);
@@ -374,9 +379,6 @@ int main() {
     zero_current(&controller.adc1_offset, &controller.adc2_offset);             // Measure current sensor zero-offset
     drv.disable_gd();
 
-
-    
-    
     wait(.1);
     /*
     gpio.enable->write(1);
@@ -406,7 +408,8 @@ int main() {
     if(isnan(E_OFFSET)){E_OFFSET = 0.0f;}
     if(isnan(M_OFFSET)){M_OFFSET = 0.0f;}
     if(isnan(I_BW) || I_BW==-1){I_BW = 1000;}
-    if(isnan(TORQUE_LIMIT) || TORQUE_LIMIT ==-1){TORQUE_LIMIT=18;}
+    if(isnan(I_MAX) || I_MAX ==-1){I_MAX=40;}
+    if(isnan(I_FW_MAX) || I_FW_MAX ==-1){I_FW_MAX=0;}
     if(isnan(CAN_ID) || CAN_ID==-1){CAN_ID = 1;}
     if(isnan(CAN_MASTER) || CAN_MASTER==-1){CAN_MASTER = 0;}
     if(isnan(CAN_TIMEOUT) || CAN_TIMEOUT==-1){CAN_TIMEOUT = 0;}

@@ -13,10 +13,6 @@
 #define D_INT_LIM V_BUS/(K_D*KI_D)  // Amps*samples
 #define Q_INT_LIM V_BUS/(K_Q*KI_Q)  // Amps*samples
 
-#define I_MAX 40.0f                 // Max Current
-#define I_MAX_FW 10.0f               // Max field weakening current
-#define I_MAX_CONT 15.0f            // Max continuous current, for thermal limiting
-
 //Observer//
 #define DT 0.000025f
 #define K_O 0.02f
