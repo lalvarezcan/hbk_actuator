@@ -60,7 +60,7 @@ volatile int state_change;
 
 void onMsgReceived() {
     //msgAvailable = true;
-    printf("%df\n\r", rxMsg.id);
+    //printf("%d\n\r", rxMsg.id);
     can.read(rxMsg);  
     if((rxMsg.id == CAN_ID)){
         controller.timeout = 0;
@@ -396,15 +396,18 @@ int main() {
     NVIC_SetPriority(TIM1_UP_TIM10_IRQn, 2);                                             // commutation > communication
     
     NVIC_SetPriority(CAN1_RX0_IRQn, 3);
-    can.filter(CAN_ID<<21, 0xFFE00004, CANStandard, 0);
+                                   // attach 'CAN receive-complete' interrupt handler    
+    
+    // If preferences haven't been user configured yet, set defaults 
+    prefs.load();                                                               // Read flash
+    
+    can.filter(CAN_ID , 0xFFF, CANStandard, 0);
                                                                     
     txMsg.id = CAN_MASTER;
     txMsg.len = 6;
     rxMsg.len = 8;
-    can.attach(&onMsgReceived);                                     // attach 'CAN receive-complete' interrupt handler    
+    can.attach(&onMsgReceived);  
     
-    // If preferences haven't been user configured yet, set defaults 
-    prefs.load();                                                               // Read flash
     if(isnan(E_OFFSET)){E_OFFSET = 0.0f;}
     if(isnan(M_OFFSET)){M_OFFSET = 0.0f;}
     if(isnan(I_BW) || I_BW==-1){I_BW = 1000;}
@@ -449,7 +452,7 @@ int main() {
     int counter = 0;
     while(1) {
         drv.print_faults();
-       wait(.1);
+        wait(.1);
        //printf("%.4f\n\r", controller.v_bus);
        /*
         if(state == MOTOR_MODE)

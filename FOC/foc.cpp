@@ -194,12 +194,12 @@ void commutate(ControllerStruct *controller, ObserverStruct *observer, GPIOStruc
        controller->v_ref = sqrt(controller->v_d*controller->v_d + controller->v_q*controller->v_q);
        
        limit_norm(&controller->v_d, &controller->v_q, OVERMODULATION*controller->v_bus);       // Normalize voltage vector to lie within curcle of radius v_bus
-       float dtc_d = controller->v_d/controller->v_bus;
-       float dtc_q = controller->v_q/controller->v_bus;
-       linearize_dtc(&dtc_d);
-       linearize_dtc(&dtc_q);
-       controller->v_d = dtc_d*controller->v_bus;
-       controller->v_q = dtc_q*controller->v_bus;
+       //float dtc_d = controller->v_d/controller->v_bus;
+       //float dtc_q = controller->v_q/controller->v_bus;
+       //linearize_dtc(&dtc_d);
+       //linearize_dtc(&dtc_q);
+       //controller->v_d = dtc_d*controller->v_bus;
+       //controller->v_q = dtc_q*controller->v_bus;
        abc(controller->theta_elec + 0.0f*DT*controller->dtheta_elec, controller->v_d, controller->v_q, &controller->v_u, &controller->v_v, &controller->v_w); //inverse dq0 transform on voltages
        svm(controller->v_bus, controller->v_u, controller->v_v, controller->v_w, &controller->dtc_u, &controller->dtc_v, &controller->dtc_w); //space vector modulation
 
