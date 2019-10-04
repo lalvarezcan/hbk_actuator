@@ -24,7 +24,7 @@ void order_phases(PositionSensor *ps, GPIOStruct *gpio, ControllerStruct *contro
     
     ///Set voltage angle to zero, wait for rotor position to settle
     abc(theta_ref, v_d, v_q, &v_u, &v_v, &v_w);                                 //inverse dq0 transform on voltages
-    svm(1.0, v_u, v_v, v_w, &dtc_u, &dtc_v, &dtc_w);                            //space vector modulation
+    svm(1.0, v_u, v_v, v_w, 0, &dtc_u, &dtc_v, &dtc_w);                            //space vector modulation
     for(int i = 0; i<20000; i++){
         TIM1->CCR3 = (PWM_ARR>>1)*(1.0f-dtc_u);                                        // Set duty cycles
         TIM1->CCR2 = (PWM_ARR>>1)*(1.0f-dtc_v);
@@ -46,7 +46,7 @@ void order_phases(PositionSensor *ps, GPIOStruct *gpio, ControllerStruct *contro
     /// Rotate voltage angle
     while(theta_ref < 4*PI){                                                    //rotate for 2 electrical cycles
         abc(theta_ref, v_d, v_q, &v_u, &v_v, &v_w);                             //inverse dq0 transform on voltages
-        svm(1.0, v_u, v_v, v_w, &dtc_u, &dtc_v, &dtc_w);                        //space vector modulation
+        svm(1.0, v_u, v_v, v_w, 0, &dtc_u, &dtc_v, &dtc_w);                        //space vector modulation
         wait_us(100);
         TIM1->CCR3 = (PWM_ARR>>1)*(1.0f-dtc_u);                                        //Set duty cycles
         TIM1->CCR2 = (PWM_ARR>>1)*(1.0f-dtc_v);
@@ -109,7 +109,7 @@ void calibrate(PositionSensor *ps, GPIOStruct *gpio, ControllerStruct *controlle
         
     ///Set voltage angle to zero, wait for rotor position to settle
     abc(theta_ref, v_d, v_q, &v_u, &v_v, &v_w);                                 // inverse dq0 transform on voltages
-    svm(1.0, v_u, v_v, v_w, &dtc_u, &dtc_v, &dtc_w);                            // space vector modulation
+    svm(1.0, v_u, v_v, v_w, 0, &dtc_u, &dtc_v, &dtc_w);                            // space vector modulation
     for(int i = 0; i<40000; i++){
         TIM1->CCR3 = (PWM_ARR>>1)*(1.0f-dtc_u);                                        // Set duty cycles
         if(PHASE_ORDER){                                   
@@ -133,7 +133,7 @@ void calibrate(PositionSensor *ps, GPIOStruct *gpio, ControllerStruct *controlle
        for(int j = 0; j<n2; j++){   
         theta_ref += delta;
        abc(theta_ref, v_d, v_q, &v_u, &v_v, &v_w);                              // inverse dq0 transform on voltages
-       svm(1.0, v_u, v_v, v_w, &dtc_u, &dtc_v, &dtc_w);                         // space vector modulation
+       svm(1.0, v_u, v_v, v_w, 0, &dtc_u, &dtc_v, &dtc_w);                         // space vector modulation
         TIM1->CCR3 = (PWM_ARR>>1)*(1.0f-dtc_u);
         if(PHASE_ORDER){                                                        // Check phase ordering
             TIM1->CCR2 = (PWM_ARR>>1)*(1.0f-dtc_v);                                    // Set duty cycles
@@ -158,7 +158,7 @@ void calibrate(PositionSensor *ps, GPIOStruct *gpio, ControllerStruct *controlle
        for(int j = 0; j<n2; j++){
        theta_ref -= delta;
        abc(theta_ref, v_d, v_q, &v_u, &v_v, &v_w);                              // inverse dq0 transform on voltages
-       svm(1.0, v_u, v_v, v_w, &dtc_u, &dtc_v, &dtc_w);                         // space vector modulation
+       svm(1.0, v_u, v_v, v_w, 0, &dtc_u, &dtc_v, &dtc_w);                         // space vector modulation
         TIM1->CCR3 = (PWM_ARR>>1)*(1.0f-dtc_u);
         if(PHASE_ORDER){
             TIM1->CCR2 = (PWM_ARR>>1)*(1.0f-dtc_v);
@@ -232,8 +232,12 @@ void calibrate(PositionSensor *ps, GPIOStruct *gpio, ControllerStruct *controlle
             
         ps->WriteLUT(lut);                                                      // write lookup table to position sensor object
         //memcpy(controller->cogging, cogging_current, sizeof(controller->cogging));  //compensation doesn't actually work yet....
-        memcpy(&ENCODER_LUT, lut, sizeof(lut));                                 // copy the lookup table to the flash array
+        
+        memcpy(&ENCODER_LUT, lut, 128*4);                                 // copy the lookup table to the flash array
         printf("\n\rEncoder Electrical Offset (rad) %f\n\r",  offset);
+        //for(int i = 0; i<128; i++){printf("%d\n\r", __int_reg[i]);}
+        //printf("\n\r %d \n\r", sizeof(lut));
+
         
         if (!prefs->ready()) prefs->open();
         prefs->flush();                                                         // write offset and lookup table to flash

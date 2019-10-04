@@ -36,11 +36,20 @@ typedef struct{
     float p_des, v_des, kp, kd, t_ff;                       // Desired position, velocity, gians, torque
     float v_ref, fw_int;                                     // output voltage magnitude, field-weakening integral
     float cogging[128];
+    int current_sector;
+    int otw_flag;                                           // Over-temp warning
+    float i_max;
+    float inverter_tab[128];
+    int oc_flag;
     } ControllerStruct;
 
 typedef struct{
     double temperature;                                              // Estimated temperature
-    double temperature2;
+    float temp_measured;
+    float q_in, q_out;
     float resistance;
+    float k;
+    float trust;
+    float delta_t;
     }   ObserverStruct;
 #endif

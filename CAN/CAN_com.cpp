@@ -1,10 +1,10 @@
 #include "CAN_com.h"
 
 
- #define P_MIN -95.5f
- #define P_MAX 95.5f
- #define V_MIN -45.0f
- #define V_MAX 45.0f
+ #define P_MIN -12.5f
+ #define P_MAX 12.5f
+ #define V_MIN -65.0f
+ #define V_MAX 65.0f
  #define KP_MIN 0.0f
  #define KP_MAX 500.0f
  #define KD_MIN 0.0f

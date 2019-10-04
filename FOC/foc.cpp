@@ -29,15 +29,21 @@ void dq0(float theta, float a, float b, float c, float *d, float *q){
        
     }
     
-void svm(float v_bus, float u, float v, float w, float *dtc_u, float *dtc_v, float *dtc_w){
+void svm(float v_bus, float u, float v, float w, int i_sector, float *dtc_u, float *dtc_v, float *dtc_w){
     /// Space Vector Modulation ///
     /// u,v,w amplitude = v_bus for full modulation depth ///
     
     float v_offset = (fminf3(u, v, w) + fmaxf3(u, v, w))*0.5f;
     
-    *dtc_u = fminf(fmaxf(((u -v_offset)/v_bus + .5f), DTC_MIN), DTC_MAX);
-    *dtc_v = fminf(fmaxf(((v -v_offset)/v_bus + .5f), DTC_MIN), DTC_MAX);
-    *dtc_w = fminf(fmaxf(((w -v_offset)/v_bus + .5f), DTC_MIN), DTC_MAX); 
+    // Dead-time compensation
+    float u_comp = DTC_COMP*(-(i_sector==4) + (i_sector==3));
+    float v_comp = DTC_COMP*(-(i_sector==2) + (i_sector==5));
+    float w_comp = DTC_COMP*((i_sector==6) - (i_sector==1));
+    
+    
+    *dtc_u = fminf(fmaxf((.5f*(u -v_offset)/(v_bus*(DTC_MAX-DTC_MIN)) + (DTC_MAX+DTC_MIN)*.5f + u_comp), DTC_MIN), DTC_MAX);
+    *dtc_v = fminf(fmaxf((.5f*(v -v_offset)/(v_bus*(DTC_MAX-DTC_MIN)) + (DTC_MAX+DTC_MIN)*.5f + v_comp), DTC_MIN), DTC_MAX);
+    *dtc_w = fminf(fmaxf((.5f*(w -v_offset)/(v_bus*(DTC_MAX-DTC_MIN)) + (DTC_MAX+DTC_MIN)*.5f + w_comp), DTC_MIN), DTC_MAX); 
     
     /*
     sinusoidal pwm
@@ -49,19 +55,6 @@ void svm(float v_bus, float u, float v, float w, float *dtc_u, float *dtc_v, flo
     
     }
 
-void linearize_dtc(float *dtc){
-    /// linearizes the output of the inverter, which is not linear for small duty cycles ///
-    float sgn = 1.0f-(2.0f*(dtc<0));
-    if(abs(*dtc) >= .01f){
-        *dtc = *dtc*.986f+.014f*sgn;
-        }
-    else{
-        *dtc = 2.5f*(*dtc);
-        }
-    
-    }
-    
-    
 void zero_current(int *offset_1, int *offset_2){                                // Measure zero-offset of the current sensors
     int adc1_offset = 0;
     int adc2_offset = 0;
@@ -85,7 +78,10 @@ void init_controller_params(ControllerStruct *controller){
     controller->k_d = K_SCALE*I_BW;
     controller->k_q = K_SCALE*I_BW;
     controller->alpha = 1.0f - 1.0f/(1.0f - DT*I_BW*2.0f*PI);
-    
+    for(int i = 0; i<128; i++)
+    {
+        controller->inverter_tab[i] = 1.0f + 1.2f*exp(-0.0078125f*i/.032f);
+    }
     }
 
 void reset_foc(ControllerStruct *controller){
@@ -101,12 +97,15 @@ void reset_foc(ControllerStruct *controller){
     controller->d_int = 0;
     controller->v_q = 0;
     controller->v_d = 0;
+    controller->otw_flag = 0;
 
     }
     
 void reset_observer(ObserverStruct *observer){
+    
     observer->temperature = 25.0f;
-    observer->resistance = .1f;
+    observer->temp_measured = 25.0f;
+    //observer->resistance = .1f;
     }
     
 void limit_current_ref (ControllerStruct *controller){
@@ -115,26 +114,59 @@ void limit_current_ref (ControllerStruct *controller){
     controller->i_q_ref = fmaxf(fminf(i_q_max_limit, controller->i_q_ref), i_q_min_limit);
     }
 
+void update_observer(ControllerStruct *controller, ObserverStruct *observer)
+{
+    /// Update observer estimates ///
+    // Resistance observer //
+    // Temperature Observer //
+    observer->delta_t = (float)observer->temperature - T_AMBIENT;
+    float i_sq = controller->i_d*controller->i_d + controller->i_q*controller->i_q;
+    observer->q_in = (R_NOMINAL*1.5f)*(1.0f + .00393f*observer->delta_t)*i_sq;
+    observer->q_out = observer->delta_t*R_TH;
+    observer->temperature += (INV_M_TH*DT)*(observer->q_in-observer->q_out);
+    
+    //float r_d = (controller->v_d*(DTC_MAX-DTC_MIN) + SQRT3*controller->dtheta_elec*(L_Q*controller->i_q))/(controller->i_d*SQRT3);
+    float r_q = (controller->v_q*(DTC_MAX-DTC_MIN) - SQRT3*controller->dtheta_elec*(L_D*controller->i_d + WB))/(controller->i_q*SQRT3);
+    observer->resistance = r_q;//(r_d*controller->i_d + r_q*controller->i_q)/(controller->i_d + controller->i_q); // voltages more accurate at higher duty cycles
+    
+    //observer->resistance = controller->v_q/controller->i_q;
+    if(isnan(observer->resistance) || isinf(observer->resistance)){observer->resistance = R_NOMINAL;}
+    float t_raw = ((T_AMBIENT + ((observer->resistance/R_NOMINAL) - 1.0f)*254.5f));
+    if(t_raw > 200.0f){t_raw = 200.0f;}
+    else if(t_raw < 0.0f){t_raw = 0.0f;}
+    observer->temp_measured = .999f*observer->temp_measured + .001f*t_raw;
+    float e = (float)observer->temperature - observer->temp_measured;
+    observer->trust = (1.0f - .004f*fminf(abs(controller->dtheta_elec), 250.0f)) * (.01f*(fminf(i_sq, 100.0f)));
+    observer->temperature -= observer->trust*.0001f*e;
+    //printf("%.3f\n\r", e);
+    
+    if(observer->temperature > TEMP_MAX){controller->otw_flag = 1;}
+    else{controller->otw_flag = 0;}
+}
 
-void commutate(ControllerStruct *controller, ObserverStruct *observer, GPIOStruct *gpio, float theta){
-        
-        /// Update observer estimates ///
-        // Resistance observer //
-        // Temperature Observer //
-        float t_rise = (float)observer->temperature - 25.0f;
-        float q_th_in = (1.0f + .00393f*t_rise)*(controller->i_d*controller->i_d*R_PHASE*SQRT3 + controller->i_q*controller->i_q*R_PHASE*SQRT3);
-        float q_th_out = t_rise*R_TH;
-        observer->temperature += INV_M_TH*DT*(q_th_in-q_th_out);
-        
-        observer->resistance = (controller->v_q - SQRT3*controller->dtheta_elec*(WB))/controller->i_q;
-        //observer->resistance = controller->v_q/controller->i_q;
-        if(isnan(observer->resistance)){observer->resistance = R_PHASE;}
-        observer->temperature2 = (double)(25.0f + ((observer->resistance*6.0606f)-1.0f)*275.5f);
-        double e = observer->temperature - observer->temperature2;
-        observer->temperature -= .001*e;
-        //printf("%.3f\n\r", e);
-        
+float linearize_dtc(ControllerStruct *controller, float dtc)
+{
+    float duty = fmaxf(fminf(abs(dtc), .999f), 0.0f);;
+    int index = (int) (duty*127.0f);
+    float val1 = controller->inverter_tab[index];
+    float val2 = controller->inverter_tab[index+1];
+    return val1 + (val2 - val1)*(duty*128.0f - (float)index);
+}
 
+void field_weaken(ControllerStruct *controller)
+{
+       /// Field Weakening ///
+       
+       controller->fw_int += .001f*(0.5f*OVERMODULATION*controller->v_bus - controller->v_ref);
+       controller->fw_int = fmaxf(fminf(controller->fw_int, 0.0f), -I_FW_MAX);
+       controller->i_d_ref = controller->fw_int;
+       float q_max = sqrt(controller->i_max*controller->i_max - controller->i_d_ref*controller->i_d_ref);
+       controller->i_q_ref = fmaxf(fminf(controller->i_q_ref, q_max), -q_max);
+       //float i_cmd_mag_sq = controller->i_d_ref*controller->i_d_ref + controller->i_q_ref*controller->i_q_ref;
+       
+}
+void commutate(ControllerStruct *controller, ObserverStruct *observer, GPIOStruct *gpio, float theta)
+{
        /// Commutation Loop ///
        controller->loop_count ++;   
        if(PHASE_ORDER){                                                                          // Check current sensor ordering
@@ -146,6 +178,7 @@ void commutate(ControllerStruct *controller, ObserverStruct *observer, GPIOStruc
            controller->i_c = I_SCALE*(float)(controller->adc2_raw - controller->adc2_offset);
            }
        controller->i_a = -controller->i_b - controller->i_c;       
+       if((abs(controller->i_b) > 41.0f)|(abs(controller->i_c) > 41.0f)|(abs(controller->i_a) > 41.0f)){controller->oc_flag = 1;}
        
        float s = FastSin(theta); 
        float c = FastCos(theta);                            
@@ -158,27 +191,31 @@ void commutate(ControllerStruct *controller, ObserverStruct *observer, GPIOStruc
         
         
         // Filter the current references to the desired closed-loop bandwidth
-        controller->i_d_ref_filt = (1.0f-controller->alpha)*controller->i_d_ref_filt + controller->alpha*controller->i_d_ref;
-        controller->i_q_ref_filt = (1.0f-controller->alpha)*controller->i_q_ref_filt + controller->alpha*controller->i_q_ref;
+        //controller->i_d_ref_filt = (1.0f-controller->alpha)*controller->i_d_ref_filt + controller->alpha*controller->i_d_ref;
+        //controller->i_q_ref_filt = (1.0f-controller->alpha)*controller->i_q_ref_filt + controller->alpha*controller->i_q_ref;
+        
+        controller->i_max = I_MAX*(!controller->otw_flag) + I_MAX_CONT*controller->otw_flag;
+        
+        // Temperature Controller //
+        /*
+        if(observer->temperature > TEMP_MAX)
+        {
+            float qdot_des = 1.0f*(TEMP_MAX - observer->temperature);
+            float i_limit = sqrt((qdot_des + observer->q_out)/(R_NOMINAL*1.5f));
+            controller->i_max = fmaxf(fminf(i_limit, I_MAX), I_MAX_CONT);
+        }
+        else{controller->i_max = I_MAX;}
+        */
+        
+        limit_norm(&controller->i_d_ref, &controller->i_q_ref, controller->i_max);
 
-       
-       /// Field Weakening ///
-       
-       controller->fw_int += .001f*(0.5f*OVERMODULATION*controller->v_bus - controller->v_ref);
-       controller->fw_int = fmaxf(fminf(controller->fw_int, 0.0f), -I_FW_MAX);
-       controller->i_d_ref = controller->fw_int;
-       //float i_cmd_mag_sq = controller->i_d_ref*controller->i_d_ref + controller->i_q_ref*controller->i_q_ref;
-       limit_norm(&controller->i_d_ref, &controller->i_q_ref, I_MAX);
-       
-       
-       
        /// PI Controller ///
        float i_d_error = controller->i_d_ref - controller->i_d;
        float i_q_error = controller->i_q_ref - controller->i_q;//  + cogging_current;
        
        // Calculate feed-forward voltages //
-       float v_d_ff = SQRT3*(1.0f*controller->i_d_ref*R_PHASE  - controller->dtheta_elec*L_Q*controller->i_q);   //feed-forward voltages
-       float v_q_ff =  SQRT3*(1.0f*controller->i_q_ref*R_PHASE +  controller->dtheta_elec*(L_D*controller->i_d + 1.0f*WB));
+       float v_d_ff = SQRT3*(0.0f*controller->i_d_ref*R_PHASE  - controller->dtheta_elec*L_Q*controller->i_q);   //feed-forward voltages
+       float v_q_ff =  SQRT3*(0.0f*controller->i_q_ref*R_PHASE +  controller->dtheta_elec*(L_D*controller->i_d + 0.0f*WB));
        
        // Integrate Error //
        controller->d_int += controller->k_d*controller->ki_d*i_d_error;   
@@ -188,20 +225,28 @@ void commutate(ControllerStruct *controller, ObserverStruct *observer, GPIOStruc
        controller->q_int = fmaxf(fminf(controller->q_int, OVERMODULATION*controller->v_bus), - OVERMODULATION*controller->v_bus); 
        
        //limit_norm(&controller->d_int, &controller->q_int, OVERMODULATION*controller->v_bus);     
-       controller->v_d = controller->k_d*i_d_error + controller->d_int ;//+ v_d_ff;  
-       controller->v_q = controller->k_q*i_q_error + controller->q_int ;//+ v_q_ff; 
-       
+       controller->v_d = controller->k_d*i_d_error + controller->d_int;// + v_d_ff;  
+       controller->v_q = controller->k_q*i_q_error + controller->q_int;// + v_q_ff; 
+       //controller->v_q = 0.0f;
+       //controller->v_d = 1.0f*controller->v_bus;
        controller->v_ref = sqrt(controller->v_d*controller->v_d + controller->v_q*controller->v_q);
        
        limit_norm(&controller->v_d, &controller->v_q, OVERMODULATION*controller->v_bus);       // Normalize voltage vector to lie within curcle of radius v_bus
-       //float dtc_d = controller->v_d/controller->v_bus;
+       float dtc = controller->v_ref/controller->v_bus;
+       float scale = linearize_dtc(controller, dtc);
+       //controller->v_d = scale*controller->v_d;
+       //controller->v_q = scale*controller->v_q;
        //float dtc_q = controller->v_q/controller->v_bus;
-       //linearize_dtc(&dtc_d);
+       
        //linearize_dtc(&dtc_q);
        //controller->v_d = dtc_d*controller->v_bus;
        //controller->v_q = dtc_q*controller->v_bus;
-       abc(controller->theta_elec + 0.0f*DT*controller->dtheta_elec, controller->v_d, controller->v_q, &controller->v_u, &controller->v_v, &controller->v_w); //inverse dq0 transform on voltages
-       svm(controller->v_bus, controller->v_u, controller->v_v, controller->v_w, &controller->dtc_u, &controller->dtc_v, &controller->dtc_w); //space vector modulation
+       abc(controller->theta_elec + 0.0f*DT*controller->dtheta_elec, scale*controller->v_d, scale*controller->v_q, &controller->v_u, &controller->v_v, &controller->v_w); //inverse dq0 transform on voltages
+       controller->current_sector = ((controller->i_a>0)<<2)|((controller->i_b>0)<<1)|(controller->i_c>0);
+       svm(controller->v_bus, controller->v_u, controller->v_v, controller->v_w, controller->current_sector, &controller->dtc_u, &controller->dtc_v, &controller->dtc_w); //space vector modulation
+       
+       
+        
 
        if(PHASE_ORDER){                                                         // Check which phase order to use, 
             TIM1->CCR3 = (PWM_ARR)*(1.0f-controller->dtc_u);                        // Write duty cycles
