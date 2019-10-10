@@ -35,7 +35,7 @@ private:
     //DigitalOut *ZTest;
     virtual void ZeroEncoderCount(void);
     virtual void ZeroEncoderCountDown(void);
-    int _CPR, flag, rotations, _ppairs, raw;
+    int _CPR, flag, rotations, _ppairs, raw, first_sample;
     //int state;
     float _offset, MechPosition, MechOffset, dir, test_pos, oldVel, out_old, velVec[40];
     int offset_lut[128];
@@ -58,7 +58,7 @@ public:
     virtual void WriteLUT(int new_lut[128]);
 private:
     float position, ElecPosition, ElecOffset, MechPosition, MechOffset, modPosition, oldModPosition, oldVel, velVec[40], MechVelocity, ElecVelocity, ElecVelocityFilt;
-    int raw, _CPR, rotations, old_counts, _ppairs;
+    int raw, _CPR, rotations, old_counts, _ppairs, first_sample;
     SPI *spi;
     DigitalOut *cs;
     int readAngleCmd;

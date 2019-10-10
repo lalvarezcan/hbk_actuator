@@ -23,6 +23,13 @@ PositionSensorAM5147::PositionSensorAM5147(int CPR, float offset, int ppairs){
     oldModPosition = 0;
     oldVel = 0;
     raw = 0;
+    first_sample = 0;
+    for(int i = 0; i<100; i++)              // Initial measurement is really noisy
+    {
+        spi->write(0);
+        wait_us(100);
+    }
+
     }
     
 void PositionSensorAM5147::Sample(float dt){
@@ -36,12 +43,16 @@ void PositionSensorAM5147::Sample(float dt){
     int off_2 = offset_lut[((raw>>7)+1)%128];
     int off_interp = off_1 + ((off_2 - off_1)*(raw - ((raw>>7)<<7))>>7);        // Interpolate between lookup table entries
     int angle = raw + off_interp;                                               // Correct for nonlinearity with lookup table from calibration
-    if(angle - old_counts > _CPR/2){
-        rotations -= 1;
-        }
-    else if (angle - old_counts < -_CPR/2){
-        rotations += 1;
-        }
+    
+    if(first_sample){
+        if(angle - old_counts > _CPR/2){
+            rotations -= 1;
+            }
+        else if (angle - old_counts < -_CPR/2){
+            rotations += 1;
+            }
+    }
+    if(!first_sample){first_sample = 1;}
     
     old_counts = angle;
     oldModPosition = modPosition;
@@ -115,6 +126,7 @@ void PositionSensorAM5147::SetElecOffset(float offset){
     }
 void PositionSensorAM5147::SetMechOffset(float offset){
     MechOffset = offset;
+    first_sample = 0;
     }
 
 int PositionSensorAM5147::GetCPR(){

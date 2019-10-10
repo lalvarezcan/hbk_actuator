@@ -183,6 +183,10 @@ extern "C" void TIM1_UP_TIM10_IRQHandler(void) {
         //for (delay = 0; delay < 55; delay++);
         
         spi.Sample(DT);                                                           // sample position sensor
+        /*
+        if(count < 10){printf("%d\n\r", spi.GetRawPosition());}
+        count ++;
+        */        
         controller.adc2_raw = ADC2->DR;                                         // Read ADC Data Registers
         controller.adc1_raw = ADC1->DR;
         controller.adc3_raw = ADC3->DR;
@@ -486,6 +490,10 @@ int main() {
     if(isnan(I_MAX_CONT) || I_MAX_CONT==-1){I_MAX_CONT = 14.0f;}
     spi.SetElecOffset(E_OFFSET);                                                // Set position sensor offset
     spi.SetMechOffset(M_OFFSET);
+    spi.Sample(1.0f);
+    if(spi.GetMechPosition() > PI){spi.SetMechOffset(M_OFFSET+2.0f*PI);}        // now zeroes to +- 30 degrees about nominal, independent of rollover point
+    else if (spi.GetMechPosition() < -PI){spi.SetMechOffset(M_OFFSET-2.0f*PI);}
+    
     int lut[128] = {0};
     memcpy(&lut, &ENCODER_LUT, sizeof(lut));
     spi.WriteLUT(lut);                                                          // Set potision sensor nonlinearity lookup table
